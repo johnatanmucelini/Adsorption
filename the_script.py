@@ -126,15 +126,17 @@ def analyse_folders(folder_path, verbose=1):
             print("xyz structure -> inp file")
 
         # setting calculation folder to ok status
-        last_slurm_file = sorted(slurms)[0][1]
+        last_slurm_file = sorted(slurms)[-1][1]
         name = folder_path + '/' + last_slurm_file
         info = read_slurm(name, verbose=verbose)
         if info["geometry_converged"] == True:
+            old_path = folder_path.replace('/','')
+            new_path = folder_path.replace('/','') + '_ok'
             if verbose > 0:
                 print("geometry optimization converged")
-            os_rename(folder_path, folder_path + '_ok')
+            os_rename(old_path, new_path )
             if verbose > 0:
-                print("{f} -> {f}_ok".format(f=folder_path))
+                print("{} -> {}_ok".format(old_path, new_path))
 
 
 if __name__ == '__main__':
