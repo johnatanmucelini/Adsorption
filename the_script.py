@@ -75,13 +75,15 @@ def read_slurm(file_path, verbose=0):
 
 
 def analyse_folders(folder_path, verbose=1):
-    if not os_path.isdir(folder_path):
+    abs_folder_path = os_path.abspath(folder_path)
+    if not os_path.isdir(abs_folder_path):
         if verbose > 0:
             print("{} is not a folder, exiting...".format(
-                folder_path))
+                abs_folder_path))
         exit()
 
-    for folder_path, folder_folders, folder_files in os_walk(folder_path):
+    revered_walk = reversed(list(os_walk(folder_path)))
+    for folder_path, folder_folders, folder_files in revered_walk:
         # if the folder was set to ok status it is not analyzed...
         if folder_path[-3:] == '_ok':
             if verbose > 0:
@@ -131,8 +133,8 @@ def analyse_folders(folder_path, verbose=1):
         name = folder_path + '/' + last_slurm_file
         info = read_slurm(name, verbose=verbose)
         if info["geometry_converged"] == True:
-            old_path = folder_path.replace('/','')
-            new_path = folder_path.replace('/','') + '_ok'
+            old_path = folder_path
+            new_path = old_path + '_ok'
             if verbose > 0:
                 print("geometry optimization converged")
             os_rename(old_path, new_path )
