@@ -1,8 +1,10 @@
+
 from sys import argv as sys_argv
 from os import walk as os_walk
 from os import path as os_path
 from os import rename as os_rename
 from re import search as re_search
+
 
 def read_inp(file_path, verbose=0):
     # reading all lines of *.inp file
@@ -53,6 +55,7 @@ def write_inp(file_path, settings_lines, structure_lines, verbose=0):
         f.writelines(structure_lines)
         f.writelines(['*'])
 
+
 def read_slurm(file_path, verbose=0):
     # reading all lines of slurm-*.out file
     with open(file_path) as f:
@@ -77,11 +80,12 @@ def analyse_folders(folder_path, verbose=1):
             print("{} is not a folder, exiting...")
         exit()
 
-    for folder_path, folder_folders, folder_files in os_walk("testes/"):
+    for folder_path, folder_folders, folder_files in os_walk(folder_path):
         # if the folder was set to ok status it is not analyzed...
         if folder_path[-3:] == '_ok':
             if verbose > 0:
-                print(">> {} folder was already setted to ok status".format(folder_path))
+                print(">> {} folder was already setted to ok status".format(
+                    folder_path))
             continue
 
         # analysing files, if there are no inp and slurms filename
@@ -102,17 +106,21 @@ def analyse_folders(folder_path, verbose=1):
         # if basic files are not present it can not be analyzed...
         if not inp or not xyz or not slurms:
             if verbose > 0:
-                print(">> {} folder miss *.inp, *.xyz, or slurm-*.out files".format(folder_path))
+                print(
+                    ">> {} folder miss *.inp, *.xyz, or slurm-*.out files".format(folder_path))
             continue
 
         # print(folder_path, xyz, inp, slurms)
         # the files here are probably fine and can be analyzed
         if verbose > 0:
-            print(">> {} folder is probably fine and will be analyzed".format(folder_path))
+            print(">> {} folder is probably fine and will be analyzed".format(
+                folder_path))
 
         # copping structure in xyz to inp
-        inp_settings, inp_structure = read_inp(folder_path + '/' + inp, verbose=verbose)
-        n_atoms, comment, xyz_structure = read_xyz(folder_path + '/' + xyz, verbose=verbose)
+        inp_settings, inp_structure = read_inp(
+            folder_path + '/' + inp, verbose=verbose)
+        n_atoms, comment, xyz_structure = read_xyz(
+            folder_path + '/' + xyz, verbose=verbose)
         write_inp(folder_path + '/' + inp + '_', inp_settings, xyz_structure)
         if verbose > 0:
             print("xyz structure -> inp file")
@@ -127,6 +135,7 @@ def analyse_folders(folder_path, verbose=1):
             os_rename(folder_path, folder_path + '_ok')
             if verbose > 0:
                 print("{f} -> {f}_ok".format(f=folder_path))
+
 
 if __name__ == '__main__':
     analyse_folders(sys_argv[1])
