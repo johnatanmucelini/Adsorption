@@ -97,20 +97,26 @@ def analyse_folders(folder_path, verbose=1):
             # inp
             if re_search('^\w+\.inp$', file):
                 inp = re_search('^\w+\.inp$', file).group()
+            else :
+                inp == None
             # xyz
             if re_search('^\w+\.xyz$', file):
                 xyz = re_search('^\w+\.xyz$', file).group()
+            else:
+                xyz = None
             # slurms
             if re_search('^slurm-\w+', file):
                 name = re_search('^slurm-\d+.out', file).group()
                 number = int(re_search('slurm-(\d+?).out', file).group(1))
                 slurms.append((number, name))
+            else:
+                slurms = None
 
         # if basic files are not present it can not be analyzed...
         if not inp or not xyz or not slurms:
             if verbose > 0:
                 print(
-                    ">> {} folder miss *.inp, *.xyz, or slurm-*.out files".format(folder_path))
+                    ">> {} folder miss an important file (*.inp, *.xyz, or slurm-*.out)".format(folder_path))
             continue
 
         # print(folder_path, xyz, inp, slurms)
