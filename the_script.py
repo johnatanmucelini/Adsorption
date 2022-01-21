@@ -77,7 +77,8 @@ def read_slurm(file_path, verbose=0):
 def analyse_folders(folder_path, verbose=1):
     if not os_path.isdir(folder_path):
         if verbose > 0:
-            print("{} is not a folder, exiting...")
+            print("{} is not a folder, exiting...".format(
+                folder_path))
         exit()
 
     for folder_path, folder_folders, folder_files in os_walk(folder_path):
@@ -136,7 +137,7 @@ def analyse_folders(folder_path, verbose=1):
                 print("geometry optimization converged")
             os_rename(old_path, new_path )
             if verbose > 0:
-                print("{} -> {}_ok".format(old_path, new_path))
+                print("{} -> {}".format(old_path, new_path))
 
 
 if __name__ == '__main__':
