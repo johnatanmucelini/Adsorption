@@ -1,10 +1,9 @@
 import numpy as np
-import scipy as sp
-import argparse
 from scipy.stats import describe
 from scipy.spatial.distance import cdist
 from scipy.cluster.hierarchy import single, fcluster
 from scipy.spatial.distance import pdist
+from scipy.cluster.vq import kmeans, vq
 
 # parser = argparse.ArgumentParser(description='This script calculate the atoms exposition to the vacuum.')
 # parser._action_groups.pop()
@@ -24,6 +23,8 @@ from scipy.spatial.distance import pdist
 # sp_file = args.save_surf
 # json_file = args.save_json
 
+DEFAULT_ATOMS_RADII = {'Pd': 2., 'O': 1.}
+
 
 def RegRDS_set(sampling_distance, N):
     """Return a set of N R3 dots (almost) regular  distributed in the surface of
@@ -33,12 +34,6 @@ def RegRDS_set(sampling_distance, N):
     https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
     samplind_distance: a float or a int grater than zero.
     N: intiger grater than zero."""
-
-    if not sampling_distance > 0:
-        sys.exit("sampling_distance must be higher than zero! Aborting...")
-
-    if (type(N) != int) or (N <= 0):
-        sys.exit("N must be an intiger grater than zero! Aborting...")
 
     cart_coordinates = []
     r = 1
@@ -85,7 +80,7 @@ def writing_points_xyz(file_name, positions):
         'H'+str(len(positions)), list(map(tuple, positions))))
 
 
-def map_surface(positions, radii, ssamples=1000):
+def map_surface(positions, radii, trial_n_dots_per_atom=1000):
     """This algorithm classify atoms in surface and core atoms employing the
     concept of atoms as ridge spheres. Then the surface atoms are the ones that
     could be touched by an fictitious adatom that approach the cluster, while
@@ -113,19 +108,17 @@ def map_surface(positions, radii, ssamples=1000):
                number of dots.
     """
 
-    print('Surface analysis:')
-
     # Centralizing atoms positions:
     mol_av_position = np.average(positions, axis=0)
     positions = positions - mol_av_position
     n_atoms = len(positions)
 
     # calculation dots positions in surfaces arround each atom
-    dots_default = RegRDS_set(1, ssamples)
+    dots_default = RegRDS_set(1, trial_n_dots_per_atom)
     n_dots_per_atom = len(dots_default)
     n_dots = n_dots_per_atom * n_atoms
-    print('    Number of dots per atom: {}'.format(n_dots_per_atom))
-    print('    Number of investigated dots: {}'.format(n_dots))
+    # print('    Number of dots per atom: {}'.format(n_dots_per_atom))
+    # print('    Number of investigated dots: {}'.format(n_dots))
     dots = []
     dots_atom = []
     for ith in range(n_atoms):
@@ -163,7 +156,29 @@ def map_surface(positions, radii, ssamples=1000):
     return dots, dots_atom
 
 
-DEFAULT_ATOMS_RADII = {'Pd': 2., 'O': 1.}
+class Matric_euclidian:
+    """Euclidian metrics tools"""
+
+    def get_distance(self, features_1, features_2):
+        """Distance metric between two samples with features_1 and features_2"""
+        dividendo = np.sum((features_1 - features_2)**2, axis=0)
+        divisor = np.sum(features_1**2 + features_2**2, axis=0)
+        return (dividendo/divisor) * 1E6
+
+    def get_feature(self, mol, reference=None):
+        """calculates the euclidian distances features for the molecules or for a
+        reference point in space"""
+        features = []
+        if reference is None:
+            reference_positions = mol.positions.mean(1)
+        else:
+            reference_positions = reference
+        dists = cdist(reference_positions, mol.positions)
+        if reference is None:
+            result = dists[0]
+        else:
+            result = dists
+        return result
 
 
 class Mol:
@@ -191,23 +206,43 @@ class Mol:
             self.positions = np.array(_positions[:, 1:4], dtype=float)
 
     def get_radii(self, atoms_radii_list=DEFAULT_ATOMS_RADII):
-        print('Getting mol raddii')
+        """Get the raddii of the present atoms based in a list of its
+        van-der-walls radius"""
         radii = []
         for ith, cheme in enumerate(self.cheme):
             radii.append(atoms_radii_list[cheme])
         self.radii = np.array(radii)
 
-    def map_surface(self):
-        dots, dots_atom = map_surface(self.positions, self.radii)
+    def map_surface(self, n_dots_per_atom):
+        """Map the surface dots positions and its atoms."""
+        print("Mapping surface dots arround the atomic structure.")
+        dots, dots_atom = map_surface(
+            self.positions, self.radii, n_dots_per_atom)
         self.surf_dots = dots
         self.surf_dors_atom = dots_atom
 
-    def featurize_surface_dots(self):
-        features =
+    def featurization_surface_dots(self, metric):
+        """Calculate the features for each dot."""
+        print("Featurization of the surface dots.")
+        self.surface_dots_features = metric.get_feature(self, self.surf_dots)
 
-    ## TODO:
-    def surface_dots_clusterize(self):
-        dots_representatives, dots_cluster = kmeans
+    def clusterization_surface_dots(self, n_cluster, n_repeat=5):
+        """Calculate the cluster of the surface dots: indexes and centroid nearest"""
+        print("Clusterization of the surface dots.")
+        data = self.surface_dots_features
+        clusterization_info = []
+        for seed in range(n_repeat):
+            # clusterizaiton: find centroids and a score*
+            # *the mean euclidian_distance_to_the centroids
+            centroids, score = kmeans(data, n_cluster, seed=seed)
+            clusterization_info.append([score, centroids])
+        top_centroids = sorted(clusterization_info)[0][1]
+        idx, _ = vq(data, top_centroids)
+        dists = cdist(top_centroids, data)
+        centroids_nearst_idx = np.argmin(dists, axis=1)
+        self.surface_dots_km_index = idx
+        self.surface_dots_km_rep_idx = centroids_nearst_idx
+        self.surface_dots_km_rep = data[centroids_nearst_idx]
 
 
 def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=100, n_struc=1e4):
@@ -217,22 +252,22 @@ def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=100, n_struc=1e4):
     # reading input structures
     mol_a = Mol(path=mol_a_path)
     mol_b = Mol(path=mol_b_path)
-    mol_a.get_radii()
+    mol_a.get_radii()  # distância ráios dos átomos padrão,  # C sp3 , C sp2, =O, -O, H, N
     mol_b.get_radii()
-    mol_a.map_surface()
-    mol_b.map_surface()
+    mol_a.map_surface(n_dots_per_atom=200)
+    mol_b.map_surface(n_dots_per_atom=200)
 
+    metric = Matric_euclidian()
+    mol_a.featurization_surface_dots(metric)
+    mol_b.featurization_surface_dots(metric)
+    mol_a.clusterization_surface_dots(n_cluster=12, n_repeat=3)
+    mol_b.clusterization_surface_dots(n_cluster=11, n_repeat=3)
 
-#         distância ráios dos átomos padrão,  # C sp3 , C sp2, =O, -O, H, N
-#         métrica de distância=euclidiana):   # euclidiana
+    for ith_a, centroid_a in enumerate(mol_a.surface_dots_km_rep):
+        for jth_b, centroid_b in enumerate(mol_b.surface_dots_km_rep):
+            #print(ith_a, jth_b, centroid_a, centroid_b)
+            pass
 
-    # amostragens superfícies
-
-    #     - amostragem da superfície mol_A_xyz: [quantidade de pontos por átomos],
-    #     - amostragem da superfície mol_B_xyz: [quantidade de pontos por átomos],
-    #
-    #     - clusterizar pontos da superfície(pontos de maior importancia) ou não...
-    #
     #     - pontos de maior importancia química OU pontos randomicos(distancia em função dos ráios dos átomos):
     #         - adicionar mol_A a mol_B
     #         - rotações na molécula adsorvida
@@ -272,5 +307,6 @@ def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=100, n_struc=1e4):
     #     - para todas as moléculas selecionadas
 
 
-path = 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz'
+#path = 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz'
+path = 'C:\\Users\\User\\Documents\\GitHub\\lucas_script\\arquivos_ref\\Cluster_AD_Pd4O8\\cluster.xyz'
 cluster_adsorption(path, path)
