@@ -212,9 +212,7 @@ class Matric_euclidian_mod:
 
     def get_distance(self, features_1, features_2):
         """Distance metric between two samples with features_1 and features_2"""
-        dividendo = np.sum((features_1 - features_2)**2, axis=0)
-        divisor = np.sum(features_1**2 + features_2**2, axis=0)
-        return (dividendo/divisor) * 1E6
+        return np.linalg.norm(features_1 - features_2)
 
     def get_feature(self, mol, reference=None):
         """calculates the euclidian distances features for the molecules or for a
@@ -247,6 +245,48 @@ class Matric_euclidian_mod:
         return result
 
 
+def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
+    """Add the image of the molecules in a new molecule"""
+    # basic information
+    if image:
+        mol_f_positions = np.append(mol_a.ipositions, mol_b.ipositions, axis=0)
+        mol_f_cheme = np.append(mol_a.surf_cheme, mol_b.surf_cheme)
+    else:
+        mol_f_positions = np.append(mol_a.positions, mol_b.positions, axis=0)
+        mol_f_cheme = np.append(mol_a.cheme, mol_b.cheme)
+    # defining Mol
+    mol_f = Mol(positions=mol_f_positions, cheme=mol_f_cheme)
+    # adding surface information
+    if add_surf_info:
+        # surf_dots
+        mol_f.surf_dots = np.append(mol_a.surf_dots, mol_b.surf_dots, axis=0)
+        # surf_dots_km_index
+        #print('surf_dots_km_index:', mol_a.surf_dots_km_index)
+        mol_f.surf_dots_km_index = np.append(
+            mol_a.surf_dots_km_index, mol_b.surf_dots_km_index + max(mol_a.surf_dots_km_index) + 1, axis=0)
+        # surf_dots_atom
+        #print('surf_dots_atom:', mol_a.surf_dots_atom)
+        mol_f.surf_dots_atom = np.append(
+            mol_a.surf_dots_atom, mol_b.surf_dots_atom + mol_a.n, axis=0)
+        # surf_dots_km_rep
+        #print('surf_dots_km_rep:', mol_a.surf_dots_km_rep)
+        mol_f.surf_dots_km_rep = np.append(
+            mol_a.surf_dots_km_rep, mol_b.surf_dots_km_rep, axis=0)
+        # surf_dots_km_rep_kmindex
+        #print('surf_dots_km_rep_kmindex:', mol_a.surf_dots_km_rep_kmindex)
+        mol_f.surf_dots_km_rep_kmindex = np.append(
+            mol_a.surf_dots_km_rep_kmindex, mol_b.surf_dots_km_rep_kmindex + max(mol_a.surf_dots_km_rep_kmindex) + 1, axis=0)
+    if image and add_surf_info:
+        mol_f.ipositions = np.append(
+            mol_a.ipositions, mol_b.ipositions, axis=0)
+        mol_f.isurf_dots = np.append(
+            mol_a.isurf_dots, mol_b.isurf_dots, axis=0)
+        mol_f.isurf_dots_km_rep = np.append(
+            mol_a.isurf_dots_km_rep, mol_b.isurf_dots_km_rep, axis=0)
+    mol_f.n = len(mol_f.positions)
+    return mol_f
+
+
 class Mol:
     def __init__(self, path=None, positions=None, cheme=None):
         self.path = path
@@ -254,12 +294,13 @@ class Mol:
         self.cheme = cheme
 
         # if niether of the positions were privided
-        if not self.path and (not self.positions and not self.cheme):
+        if self.path is None and (self.positions is None and self.cheme is None):
             print(
                 'Mol_path or positions + cheme must be provided to create a Mol.')
+            exiting
 
         # from the path
-        if (not self.positions and not self.cheme) and self.path:
+        if (self.positions is None and self.cheme is None) and self.path is not None:
             print('Reading mol from {}'.format(self.path))
             with open(self.path) as mol_file:
                 lines_as_list = mol_file.readlines()
@@ -286,9 +327,17 @@ class Mol:
             self.positions, self.radii, n_dots_per_atom)
         self.surf_dots = dots
         self.surf_dots_atom = dots_atom
-        self.surf_atoms = np.unique(dots_atom)
-        self.surf_atoms_positions = self.positions[self.surf_atoms]
-        self.surf_atoms_raddii = self.radii[self.surf_atoms]
+        self.surf_atoms_index, counts = np.unique(
+            dots_atom, return_counts=True)
+        self.surf_cheme = self.cheme[self.surf_atoms_index]
+        self.surf_atoms_positions = self.positions[self.surf_atoms_index]
+        self.surf_atoms_raddii = self.radii[self.surf_atoms_index]
+        # area:
+        n_dots_per_atom_r = len(build_s2_grid(1, n_dots_per_atom))
+        a = sum(counts * 4 * np.pi*self.surf_atoms_raddii
+                ** 2 / n_dots_per_atom_r)
+        print('    Number of point in the surface: {}'.format(len(dots)))
+        print('    Approximated surface area: {:0.3f} AA'.format(a))
 
     def featurization_surface_dots(self, metric):
         """Calculate the features for each dot."""
@@ -315,27 +364,37 @@ class Mol:
         self.surf_dots_km_rep_idx = centroids_nearst_idx
         self.surf_dots_km_rep = self.surf_dots[centroids_nearst_idx]
 
-    def center_on(self, position, surface_image=False):
-        """Center positions or surface atoms images positions on given
-        position."""
-        if surface_image:
-            self.ipositions = self.surf_atoms_positions - position
+    def translate_by(self, vector, image=False):
+        """Translate atoms and isurf_dots (optional) on any given position."""
+        if image:
+            self.ipositions = self.positions + vector
+            self.isurf_dots = self.surf_dots + vector
+            self.isurf_dots_km_rep = self.surf_dots_km_rep + vector
         else:
-            self.positions = self.positions - position
+            self.positions = self.positions + vector
 
-    def rotate(self, rot_matrix, surface_image=False):
+    def centralize(self):
+        """Centralize in itself."""
+        self.positions = self.positions - self.positions.mean(axis=0)
+
+    def rotate(self, rot_matrix, image=False):
         """Random sequence of SO(3) rotations, based in the Hopf coordinates
         parametrizations for SO(3)."""
-        if surface_image:
+        if image:
             self.ipositions = np.dot(self.ipositions, rot_matrix)
+            self.isurf_dots = np.dot(self.isurf_dots, rot_matrix)
+            self.isurf_dots_km_rep = np.dot(self.isurf_dots_km_rep, rot_matrix)
         else:
             self.positions = np.dot(self.positions, rot_matrix)
 
     def to_xyz(self, file_name, surf_dots=False, surf_dots_color_by=None,
-               special_surf_dots=None):
+               special_surf_dots=None, verbose=True):
         """Write positions, a list or array of R3 points, in a xyz file file_named.
         file_name: a string with the path of the xyz document which will be writed.
         positions: a list or numpy array with the atoms positions."""
+
+        if verbose:
+            print('Writing mol to: {}'.format(file_name))
 
         # modiffied vesta atoms to colorize
         letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
@@ -354,22 +413,25 @@ class Mol:
             surf_index_to_cheme_dict[ith] = color_base_surf[ith]
             rep_index_to_cheme_dict[ith] = color_base_rep[ith]
 
-        print('Add this lines in the file: elements.ini (inside VESTA folder)')
-        for s_val, r_val in zip(surf_index_to_cheme_dict.values(), rep_index_to_cheme_dict.values()):
-            color = np.random.rand(3)
-            print('  1  {}  0.25  0.25  0.25     {:0.5f}    {:0.5f}    {:0.5f}'.format(s_val,
-                                                                                       *color
-                                                                                       ))
-            print('  1  {}  0.45  0.45  0.45     {:0.5f}    {:0.5f}    {:0.5f}'.format(r_val,
-                                                                                       *color
-                                                                                       ))
+        if False:
+            print('Add this lines in the file: elements.ini (inside VESTA folder)')
+            for s_val, r_val in zip(surf_index_to_cheme_dict.values(), rep_index_to_cheme_dict.values()):
+                color = np.random.rand(3)
+                str_s = '  1  {}  0.25  0.25  0.25     {:0.5f}    {:0.5f}    {:0.5f}'
+                str_r = '  1  {}  0.45  0.45  0.45     {:0.5f}    {:0.5f}    {:0.5f}'
+                print(str_s.format(s_val, *color))
+                print(str_r.format(r_val, *color))
 
         # adding xyz information
         # atoms:
         atoms_positions = self.positions
         atoms_cheme = self.cheme
+        if len(atoms_positions) != len(atoms_cheme):
+            print('Tamanho dos vetores positions cheme é diferente b: {} {}'.format(
+                len(atoms_positions), len(atoms_cheme)))
+
+        # surf dots:
         if surf_dots:
-            # surf dots:
             atoms_positions = np.append(
                 atoms_positions, self.surf_dots, axis=0)
             if surf_dots_color_by is None:
@@ -386,24 +448,34 @@ class Mol:
                     new_chemes.append(
                         surf_index_to_cheme_dict[origin_atom_index])
             atoms_cheme = np.append(atoms_cheme, np.array(new_chemes))
+        if len(atoms_positions) != len(atoms_cheme):
+            print('Tamanho dos vetores positions cheme é diferente s: {} {}'.format(
+                len(atoms_positions), len(atoms_cheme)))
+
+        # adding km representative dots result
         if special_surf_dots:
-            # adding km representative dots result
+            # print('Special surf dots:', len(self.surf_dots_km_rep))
             atoms_positions = np.append(atoms_positions, self.surf_dots_km_rep,
                                         axis=0)
             new_chemes = []
             n_clusters = max(self.surf_dots_km_rep_kmindex) + 1
+            # print('Max km index:', max(self.surf_dots_km_rep_kmindex)
+            #       + 1, self.surf_dots_km_rep_kmindex)
             for i in range(n_clusters):
                 if special_surf_dots == 'kmeans':
                     new_chemes.append(rep_index_to_cheme_dict[i])
                 else:
-                    new_chemes.append('XX')
+                    new_chemes.append(['XX'])
+            # print('new_chemes', len(new_chemes))
             atoms_cheme = np.append(atoms_cheme, new_chemes)
 
+        # writting
+        if len(atoms_positions) != len(atoms_cheme):
+            print('Tamanho dos vetores positions cheme é diferente w: {} {}'.format(
+                len(atoms_positions), len(atoms_cheme)))
         with open(file_name, mode='w') as xyz_file:
             size = len(atoms_positions)
             xyz_file.write(str(size) + '\n\n')
-            # print('size:', size, self.n, len(
-            #     self.surf_dots), len(self.surf_dots_km_rep), atoms_cheme)
             for ith, (element, position) in enumerate(zip(atoms_cheme, atoms_positions)):
                 #print(ith, element, position)
                 if ith < size - 1:
@@ -411,45 +483,69 @@ class Mol:
                 elif ith == size - 1:
                     #print(element, position)
                     xyz_file.write('{} {} {} {}'.format(element, *position))
-            print('size:', size, self.n, len(
-                self.surf_dots), len(self.surf_dots_km_rep), atoms_cheme)
+            # print('size:', size, self.n, len(
+            #     self.surf_dots), len(self.surf_dots_km_rep), atoms_cheme)
             # print('last chemes:', atoms_cheme[-5:])
             # print('last positions:', atoms_positions[-5:])
 
+    def add_atoms(self, elements, positions):
+        """Add atoms to the system"""
+        self.positions = np.append(self.positions, positions, axis=0)
+        self.cheme = np.append(self.cheme, elements)
+        self.n = len(self.positions)
+        if 'ipositions' in dir(self):
+            self.ipositions = np.append(self.ipositions, positions, axis=0)
 
-def overlap(mol_a, mol_b, surface_image=False):
+    def surf_to_real(self):
+        if 'ipositions' in dir(self):
+            # print('to_real', len(self.positions), len(self.ipositions))
+            self.positions = self.ipositions * 1.
+            self.surf_dots = self.isurf_dots * 1.
+            self.surf_dots_km_rep = self.isurf_dots_km_rep * 1.
+
+
+def overlap(mol_a, mol_b, flexibility=0.85, image=False):
     """Verify if two atomic structures overlap, all structure or just surface
     atoms images."""
-    if surface_image:
-        ab_distance_matrix_size = len(mol_a.surf_dots) * mol_b.n
-        ba_distance_matrix_size = len(mol_b.surf_dots) * mol_a.n
-        if ab_distance_matrix_size > ba_distance_matrix_size:
-            distances = cdist(mol_a.surf_atoms_positions, mol_b.surf_dots)
-            atoms_raddii_ref = mol_a.surf_atoms_raddii
-            n_dots = len(mol_b.surf_dots)
-            n_atoms = len(mol_a.surf_atoms_positions)
-        else:
-            distances = cdist(mol_b.surf_atoms_positions, mol_a.surf_dots)
-            atoms_raddii_ref = mol_b.surf_atoms_raddii
-            n_dots = len(mol_a.surf_dots)
-            n_atoms = len(mol_b.surf_atoms_positions)
-        atoms_raddii_by_dot = np.array(
-            [atoms_raddii_ref]*n_dots).reshape(n_dots, n_atoms).T
-        print(np.sum(distances < atoms_raddii_by_dot))
-        if np.sum(distances < atoms_raddii_by_dot):
+    if image:
+        distances = cdist(mol_a.ipositions, mol_b.ipositions)
+        radii_sum = mol_a.radii.reshape(-1, 1) + mol_b.radii.reshape(1, -1)
+        #print(distances)
+        #print(radii_sum)
+        if np.any((distances/radii_sum) < flexibility):
             result = True
         else:
             result = False
-        return result
+    return result
+    # atoms_raddii_by_dot = np.array(
+    #     [atoms_raddii_ref]*n_dots).reshape(n_dots, n_atoms).T
+    # print(np.sum(distances < atoms_raddii_by_dot))
+    # if np.sum(distances < atoms_raddii_by_dot):
+    #     result = True
+    # else:
+    #     result = False
+    # return result
 
 
-def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=2000, n_struc=1e4):
+def status(c_all, c_repeated, c_overlapped, c_accepted, refused_ds):
+    print('-'*80)
+    print("Number of combined structure: {}".format(c_all))
+    print("Number of c_accepted structure: {}".format(c_accepted))
+    print("Number of repeated structure: {}".format(c_repeated))
+    print("Number of overlapped structure: {}".format(c_overlapped))
+    print("Refused distances: {:0.3e}, {:0.3f}, {:0.3f}, {:0.3f}, {:0.3f}".format(
+        *np.quantile(np.array(refused_ds), [0, 0.25, 0.5, 0.75, 1])))
+
+
+def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=200, n_struc=1e4):
     """It build adsorbed structures between two molecules, mol_a and mol_b.
     Both molecules surface are maped based in a """
 
     # reading input structures
     mol_a = Mol(path=mol_a_path)
+    mol_a.centralize()
     mol_b = Mol(path=mol_b_path)
+    mol_b.centralize()
 
     # getting raddii
     # TODO: interpretation of the atoms: C sp3 , C sp2, =O, -O, H, N
@@ -464,42 +560,85 @@ def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=2000, n_struc=1e4):
     mol_a.featurization_surface_dots(metric)
     mol_b.featurization_surface_dots(metric)
     #print(mol_a.surf_dots_features.shape)
-    mol_a.clusterization_surface_dots(n_cluster=25, n_repeat=5)
-    mol_b.clusterization_surface_dots(n_cluster=12, n_repeat=5)
+    mol_a.clusterization_surface_dots(n_cluster=30, n_repeat=10)
+    mol_b.clusterization_surface_dots(n_cluster=15, n_repeat=10)
     mol_a.to_xyz('cluster_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
     mol_b.to_xyz('mol_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
 
     # calculation all rotations around each contact between mols a and b
-    mesh_size = 0.8
+    mesh_size = 0.6
     us1 = 2*np.pi*1
     us2 = 4*np.pi*1
     n_samples_spher = int(round(us1/mesh_size))
     n_samples_circ = int(round(us2/mesh_size**2))
     s2_coords = build_s2_grid(1, n_samples_spher, coords_system='spher')
     s1_coords = build_s1_grid(1, n_samples_circ, coords_system='circ')
-    print("Number of rotations:", len(s2_coords)*len(s1_coords))
     rots = build_SO3_from_S1S2(s1_coords, s2_coords)
+    n_rots = len(s2_coords)*len(s1_coords)
+    print("Number of rotations: {} ({}, {})".format(
+        n_rots, len(s2_coords), len(s1_coords)))
+
+    c_all = 0
+    c_repeated = 0
+    c_overlapped = 0
+    c_accepted = 0
+    selected_mols_ab = []
+    refused_ds = []
+    threshold = 1
+
+    print('Total number of trial configuration: {}'.format(
+        n_rots*len(mol_a.surf_dots_km_rep)*len(mol_b.surf_dots_km_rep)))
 
     for ith_a, centroid_a in enumerate(mol_a.surf_dots_km_rep):
         for jth_b, centroid_b in enumerate(mol_b.surf_dots_km_rep):
             for kth, rot in enumerate(rots):
                 #print(ith_a, jth_b, centroid_a, centroid_b)
-                mol_a.center_on(centroid_a, surface_image=True)
-                mol_b.center_on(centroid_b, surface_image=True)
-                mol_b.rotate(rot, surface_image=True)
+                mol_a.translate_by(-centroid_a, image=True)
+                mol_b.translate_by(-centroid_b, image=True)
+                mol_b.rotate(rot, image=True)
 
-                print(overlap(mol_a, mol_b, surface_image=True))
+                if not overlap(mol_a, mol_b, image=True):
+                    mol_ab = add_mols(mol_a, mol_b, image=True)
+                    refs = np.array([mol_a.ipositions.mean(
+                        axis=0), mol_b.ipositions.mean(axis=0), np.zeros(3)])
+                    metric = Matric_euclidian_mod()
+                    mol_ab.features = metric.get_feature(
+                        mol_ab, reference=refs).flatten()
+                    repeated = False
+                    for nth, s_mol_ab in enumerate(selected_mols_ab):
+                        d = metric.get_distance(
+                            mol_ab.features, s_mol_ab.features)
+                        if d < threshold:
+                            repeated = True
+                            break
+                    if not repeated:
+                        selected_mols_ab.append(mol_ab)
+                        mol_ab = add_mols(
+                            mol_a, mol_b, image=True, add_surf_info=True)
+                        mol_ab.surf_to_real()
+                        #mol_ab.to_xyz('/home/acer/lucas_script/poll_withsurfs/{}.xyz'.format(c_all), surf_dots=True,
+                        #              surf_dots_color_by='kmeans', special_surf_dots='kmeans', verbose=False)
+                        mol_ab.to_xyz(
+                            '/home/acer/lucas_script/poll/{}.xyz'.format(c_all), verbose=False)
+                        c_accepted += 1
 
-                break
-            break
-        break
+                    else:
+                        c_repeated += 1
+                        refused_ds.append(d)
+                else:
+                    c_overlapped += 1
 
-    #     - pontos de maior importancia química OU pontos randomicos(distancia em função dos ráios dos átomos):
-    #         - adicionar mol_A a mol_B
-    #         - rotações na molécula adsorvida
-    #         - verificação de overlap, caso passe, estrutura final --> poll de estruturas válidas
+                c_all += 1
+                if (c_all % 10000) == 0:
+                    status(c_all, c_repeated, c_overlapped,
+                           c_accepted, refused_ds)
+        #     break
+        # break
+
+    status(c_all, c_repeated, c_overlapped, c_accepted, refused_ds)
+
     #     - kmeans
     #     # output
     #     - set de opçoes de output: {pasta_output name: 'folder_xyz_files',
@@ -519,7 +658,8 @@ def cluster_adsorption(mol_a_path, mol_b_path, n_surf_dots=2000, n_struc=1e4):
     #     - para todas as moléculas selecionadas
 
 
-#path = 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz'
-path_cluster = 'C:\\Users\\User\\Documents\\GitHub\\lucas_script\\arquivos_ref\\Cluster_AD_Pd4O8\\cluster.xyz'
-path_mol = 'C:\\Users\\User\\Documents\\GitHub\\lucas_script\\arquivos_ref\\Cluster_AD_Pd4O8\\molecule.xyz'
+path_cluster = 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz'
+path_mol = 'arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz'
+#path_cluster = 'C:\\Users\\User\\Documents\\GitHub\\lucas_script\\arquivos_ref\\Cluster_AD_Pd4O8\\cluster.xyz'
+#path_mol = 'C:\\Users\\User\\Documents\\GitHub\\lucas_script\\arquivos_ref\\Cluster_AD_Pd4O8\\molecule.xyz'
 cluster_adsorption(path_cluster, path_mol)
