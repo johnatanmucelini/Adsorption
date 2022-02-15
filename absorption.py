@@ -139,7 +139,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     status(c_all, c_repeated, c_overlapped, c_accepted, refused_ds)
 
     # final clustering
-    print('Clustering of the final structures.')
+    print('Clustering to selec representative structures.')
     mols_ab = np.array(selected_mols_ab)
     features = []
     for nth, s_mol_ab in enumerate(mols_ab):
