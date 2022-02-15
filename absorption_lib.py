@@ -308,12 +308,29 @@ class Mol:
             self.cheme = np.array(_cheme, dtype=str)
             self.positions = np.array(_positions[:, 1:4], dtype=float)
 
-    def get_radii(self, atoms_radii_list=DEFAULT_ATOMS_RADII):
+    def get_radii(self, atoms_radii_preferences=[2]):
         """Get the raddii of the present atoms based in a list of its
         van-der-walls radius"""
+        msg_ref = "  Atom {}, vdw radii {}, ref {}"
+        msg_not_ref = "  WARNING: missing reference for {} vdw radius, employing {}."
         radii = []
         for ith, cheme in enumerate(self.cheme):
-            radii.append(atoms_radii_list[cheme])
+            found = False
+            for obj in atoms_radii_preferences:
+                if not found:
+                    if isinstance(obj, dict):
+                        if cheme in obj.keys():
+                            radii.append(obj[cheme])
+                            found = True
+                            if 'ref' in obj.keys():
+                                print(msg_ref.format(
+                                    cheme, obj[cheme], obj['ref']))
+                            else:
+                                print(msg_not_ref.format(cheme, obj[cheme]))
+                    if isinstance(obj, int):
+                        radii.append(obj)
+                        found = True
+                        print(msg_not_ref.format(cheme, obj[cheme], obj.ref))
         self.radii = np.array(radii)
 
     def build_surface(self, atoms_surface_density=4):
@@ -329,9 +346,9 @@ class Mol:
         self.surf_atoms_positions = self.positions[self.surf_atoms_index]
         self.surf_atoms_raddii = self.radii[self.surf_atoms_index]
         # area:
-        print('    Number of point in the surface: {}'.format(len(dots)))
-        print('    Surface area   : {:10.3f} AA'.format(area))
-        print('    Points density : {:10.3f} AA^-1'.format(len(dots)/area))
+        print('    N surface points {:7d}'.format(len(dots)))
+        print('    Surface area      {:10.3f} AA'.format(area))
+        print('    Points density    {:10.3f} AA^-1'.format(len(dots)/area))
 
     def featurization_surface_dots(self, metric):
         """Calculate the features for each dot."""
@@ -521,15 +538,15 @@ def overlap(mol_a, mol_b, flexibility=0.85, image=False):
     # return result
 
 
-def status(c_all, c_repeated, c_overlapped, c_accepted, refused_ds):
+def status(c_all, n_config, c_repeated, c_overlapped, c_accepted, refused_ds):
     print('-'*80)
-    print("Number of structures total      {:10d}".format(c_all))
-    print("Number of structures accepted   {:10d}  {:>8.2%}".format(
+    print("N structures analyzed   {:10d}  {:>8.2%}".format(
+        c_all, c_all/n_config))
+    print("N structures accepted   {:10d}  {:>8.2%}".format(
         c_accepted, c_accepted/c_all))
-    print("Number of structures repeated   {:10d}  {:>8.2%}".format(
+    print("N structures repeated   {:10d}  {:>8.2%}".format(
         c_repeated, c_repeated/c_all))
-    print("Number of structures overlapped {:10d}  {:>8.2%}".format(
+    print("N structures overlapped {:10d}  {:>8.2%}".format(
         c_overlapped, c_overlapped/c_all))
     print("Refused distances quantiles: {:0.3e}, {:0.3f}, {:0.3f}, {:0.3f}, {:0.3f}".format(
         *np.quantile(np.array(refused_ds), [0, 0.25, 0.5, 0.75, 1])))
-    print('-'*80)
