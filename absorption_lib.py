@@ -1,8 +1,7 @@
-import shutil
-import os
+"""Tool employed to the absorption """
+
 import sys
 import numpy as np
-from scipy.stats import describe
 from scipy.spatial.distance import cdist
 from scipy.cluster.hierarchy import single, fcluster
 from scipy.spatial.distance import pdist
@@ -81,7 +80,7 @@ def build_SO3_from_S1S2(s1_coords, s2_coords):
     quarternions = np.array(quarternions)
 
     rot_matrix = []
-    for nth, (qr, qi, qj, qk) in enumerate(quarternions):
+    for qr, qi, qj, qk in quarternions:
         # s = 1/sum(quarternions[nth]**2)
         # print(s)
         rot_matrix.append(np.array([
@@ -120,12 +119,9 @@ def build_surface(positions, radii, atoms_surface_density=5):
                number of dots.
     """
 
-    trial_n_dots_per_atom = atoms_surface_density * 4 * np.pi * radii**2
     # calculation dots positions in surfaces arround each atom
+    trial_n_dots_per_atom = atoms_surface_density * 4 * np.pi * radii**2
     n_atoms = len(positions)
-    #
-    #n_dots_per_atom = len(dots_default)
-
     dots_atom = np.empty(0, int)
     n_dots_per_atom = []
     dots = np.empty((0, 3), float)
@@ -166,13 +162,10 @@ def build_surface(positions, radii, atoms_surface_density=5):
     dots_atom = dots_atom[larges_cluster_dots]
 
     area_per_atom_dot = (4 * np.pi*radii ** 2) / n_dots_per_atom
-    #print(area_per_atom_dot, dots_atom, area_per_atom_dot[dots_atom])
+    # print(area_per_atom_dot, dots_atom, area_per_atom_dot[dots_atom])
     area = sum(area_per_atom_dot[dots_atom])
 
     return dots, dots_atom, area
-
-# TODO: Tem um erro aqui, as distâncias de cada vetor de feature precisam ser
-#       sorteadas pra que fiquem na ordem certa
 
 
 class Matric_euclidian:
@@ -210,7 +203,6 @@ class Matric_euclidian_mod:
     def get_feature(self, mol, reference=None):
         """calculates the euclidian distances features for the molecules or for a
         reference point in space"""
-        features = []
         if reference is None:
             reference_positions = mol.positions.mean(1)
         else:
@@ -220,17 +212,11 @@ class Matric_euclidian_mod:
         n_cheme = len(ucheme)
         e_index = mol.cheme == ucheme[0]
         dists = np.sort(cdist(reference_positions, mol.positions[e_index]))
-        #print('dist1:', dists.shape)
+        # print('dist1:', dists.shape)
         for ith in range(1, n_cheme):
             e_index = mol.cheme == ucheme[ith]
-            #dist = cdist(reference_positions, mol.positions[e_index])
-            #sorted_dist = np.sort(dist, axis=1)
-            #print('sorting:', dist[1000], '-->', sorted_dist[1000])
-            #dists = np.append(dists, sorted_dist, axis=1)
-            dists = np.append(dists, np.sort(
-                cdist(reference_positions, mol.positions[e_index]), axis=1), axis=1)
-            #print('dist:', dist.shape, 'sorted_dist',
-            #      sorted_dist.shape, 'dists', dists.shape)
+            dists = np.append(dists, np.sort(cdist(reference_positions, mol.positions[e_index]), axis=1),
+                              axis=1)
         if reference is None:
             result = dists[0]
         else:
@@ -256,7 +242,8 @@ def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
         # surf_dots_km_index
         #print('surf_dots_km_index:', mol_a.surf_dots_km_index)
         mol_f.surf_dots_km_index = np.append(
-            mol_a.surf_dots_km_index, mol_b.surf_dots_km_index + max(mol_a.surf_dots_km_index) + 1, axis=0)
+            mol_a.surf_dots_km_index, mol_b.surf_dots_km_index
+            + max(mol_a.surf_dots_km_index) + 1, axis=0)
         # surf_dots_atom
         #print('surf_dots_atom:', mol_a.surf_dots_atom)
         mol_f.surf_dots_atom = np.append(
@@ -268,7 +255,8 @@ def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
         # surf_dots_km_rep_kmindex
         #print('surf_dots_km_rep_kmindex:', mol_a.surf_dots_km_rep_kmindex)
         mol_f.surf_dots_km_rep_kmindex = np.append(
-            mol_a.surf_dots_km_rep_kmindex, mol_b.surf_dots_km_rep_kmindex + max(mol_a.surf_dots_km_rep_kmindex) + 1, axis=0)
+            mol_a.surf_dots_km_rep_kmindex, mol_b.surf_dots_km_rep_kmindex
+            + max(mol_a.surf_dots_km_rep_kmindex) + 1, axis=0)
     if image and add_surf_info:
         mol_f.ipositions = np.append(
             mol_a.ipositions, mol_b.ipositions, axis=0)
@@ -280,9 +268,6 @@ def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
     return mol_f
 
 
-DEFAULT_ATOMS_RADII = {'Pd': 2.1, 'O': 2.2, 'C': 2}
-
-
 class Mol:
     def __init__(self, path=None, positions=None, cheme=None):
         self.path = path
@@ -290,7 +275,8 @@ class Mol:
         self.cheme = cheme
 
         # if niether of the positions were privided
-        if self.path is None and (self.positions is None and self.cheme is None):
+        if self.path is None and (self.positions is None and self.cheme is
+                                  None):
             print(
                 'Mol_path or positions + cheme must be provided to create a Mol.')
             sys.exit(1)
@@ -311,10 +297,12 @@ class Mol:
     def get_radii(self, atoms_radii_preferences=[2]):
         """Get the raddii of the present atoms based in a list of its
         van-der-walls radius"""
-        msg_ref = "  Atom {}, vdw radii {}, ref {}"
-        msg_not_ref = "  WARNING: missing reference for {} vdw radius, employing {}."
+        msg_ref = "    Atom {}, vdw radii {}, ref {}."
+        msg_not_ref = "    Atom {}, vdw radii {}, missing reference!\n" \
+            "        WARNING: missing reference!\n" \
+            "        Add a vdw radii a it ref in adsorption.py, line 99."
         radii = []
-        for ith, cheme in enumerate(self.cheme):
+        for cheme in self.cheme:
             found = False
             for obj in atoms_radii_preferences:
                 if not found:
@@ -356,7 +344,8 @@ class Mol:
         self.surf_dots_features = metric.get_feature(self, self.surf_dots)
 
     def clustering_surface_dots(self, n_cluster, n_repeat=5):
-        """Calculate the cluster of the surface dots: indexes and centroid nearest"""
+        """Calculate the cluster of the surface dots: indexes and centroid
+        nearest"""
         print("Clustering of the surface dots.")
         data = self.surf_dots_features
         top_score = 1e20
@@ -400,9 +389,7 @@ class Mol:
 
     def to_xyz(self, file_name, surf_dots=False, surf_dots_color_by=None,
                special_surf_dots=None, verbose=True):
-        """Write positions, a list or array of R3 points, in a xyz file file_named.
-        file_name: a string with the path of the xyz document which will be writed.
-        positions: a list or numpy array with the atoms positions."""
+        """Write mol object to a xyz files with and without surf dots."""
 
         if verbose:
             print('Writing mol to: {}'.format(file_name))
@@ -413,9 +400,9 @@ class Mol:
         color_base_surf = []
         color_base_rep = []
         for c1, c2 in zip(['@', '&'], ['#', '!']):
-            for l in letras:
-                color_base_surf.append(c1 + l)
-                color_base_rep.append(c2 + l)
+            for le in letras:
+                color_base_surf.append(c1 + le)
+                color_base_rep.append(c2 + le)
         color_base_surf = np.array(color_base_surf)
         color_base_rep = np.array(color_base_rep)
         surf_index_to_cheme_dict = {}
@@ -423,15 +410,6 @@ class Mol:
         for ith in range(len(color_base_surf)):
             surf_index_to_cheme_dict[ith] = color_base_surf[ith]
             rep_index_to_cheme_dict[ith] = color_base_rep[ith]
-
-        if False:
-            print('Add this lines in the file: elements.ini (inside VESTA folder)')
-            for s_val, r_val in zip(surf_index_to_cheme_dict.values(), rep_index_to_cheme_dict.values()):
-                color = np.random.rand(3)
-                str_s = '  1  {}  0.25  0.25  0.25     {:0.5f}    {:0.5f}    {:0.5f}'
-                str_r = '  1  {}  0.45  0.45  0.45     {:0.5f}    {:0.5f}    {:0.5f}'
-                print(str_s.format(s_val, *color))
-                print(str_r.format(r_val, *color))
 
         # adding xyz information
         # atoms:
@@ -515,7 +493,7 @@ class Mol:
             self.surf_dots_km_rep = self.isurf_dots_km_rep * 1.
 
 
-def overlap(mol_a, mol_b, flexibility=0.85, image=False):
+def overlap(mol_a, mol_b, ovlp_threshold=0.85, image=False):
     """Verify if two atomic structures overlap, all structure or just surface
     atoms images."""
     if image:
@@ -523,7 +501,7 @@ def overlap(mol_a, mol_b, flexibility=0.85, image=False):
         radii_sum = mol_a.radii.reshape(-1, 1) + mol_b.radii.reshape(1, -1)
         #print(distances)
         #print(radii_sum)
-        if np.any((distances/radii_sum) < flexibility):
+        if np.any((distances/radii_sum) < ovlp_threshold):
             result = True
         else:
             result = False
