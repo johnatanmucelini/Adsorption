@@ -110,7 +110,7 @@ optional.add_argument('--n_repeat_km', nargs=None, action='store',
                       help='Number of times to repeat each clustering. '
                       + '(default: 20)')
 optional.add_argument('--rot_mesh_size', nargs=None, action='store',
-                      metavar='val', default=0.8,
+                      metavar='val', default=1.26,
                       help='Size of the rotations mesh (default: 0.8, change '
                       + 'it slowly)')
 optional.add_argument('--ovlp_threshold', nargs=None, action='store',
@@ -124,14 +124,14 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       help='Sufix of the output folders: '
                       + 'folder_xyz_files+surfix and '
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
-# args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-#                           + 'arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
-#                           + '--surf_ks 15 5 --n_final 100 --surf_d 5 '
-#                           + '--n_repeat_km 20 --rot_mesh_size 0.8 '
-#                           + '--ovlp_threshold 0.8 --sim_threshold 1.0 '
-#                           + '--out_sufix _1'
-#                           ).split())
-args = parser.parse_args(['--help'])
+args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
+                          + 'arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
+                          + '--surf_ks 15 5 --n_final 100 --surf_d 20 '
+                          + '--n_repeat_km 20 --rot_mesh_size 0.8 '
+                          + '--ovlp_threshold 0.8 --sim_threshold 1.0 '
+                          + '--out_sufix _1'
+                          ).split())
+# args = parser.parse_args(['--help'])
 
 # sim_threshold=float(args.sim_threshold),
 # ovlp_threshold=float(args.ovlp_threshold),
@@ -160,7 +160,27 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     n_rots_s1 = len(s1_coords)
     n_rots_s2 = len(s2_coords)
     n_rots = n_rots_s1 * n_rots_s2
+    print('AAA', (n_rots/(8*np.pi**2))**(1./3.))
     n_config = n_rots * surface_km_mol_a_cluster * surface_km_mol_b_cluster
+    # test rotations uniformity
+    coords_cart = lib.build_s2_grid(1, 100, coords_system='cart')
+    keep = []
+    for cart in coords_cart:
+        x, y, z = cart
+        if x > 0 and y > 0 and z > 0:  # removing any symmetry
+            keep.append(cart)
+    keep = np.array(keep)
+    rotate_images = np.empty((0, 3), float)
+    for rot in rots:
+        rotate_images = np.append(rotate_images, np.dot(keep, rot), axis=0)
+    rotate_images = np.array(rotate_images)
+    mean_xyz_value = np.sum(rotate_images, axis=0)
+    if np.any(np.abs(mean_xyz_value) > 1e-4):
+        print('WARNING: rotations may not be uniform enought.'
+              + 'Rotation test x,y,z: {:2.4e} {:2.4e} {:2.4e}'.format(np.abs(
+                                                            mean_xyz_value))
+              + 'Consider increase the number of ratations by decreasing the '
+              + 'parameter rot_mesh_size')
 
     print('+'+'-'*78+'+')
     print(' {:^76s} '.format(
@@ -240,7 +260,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('Surface clustering results:')
     mol_a.to_xyz('mol_a_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
-    mol_b.to_xyz('mol_a_km.xyz', surf_dots=True,
+    mol_b.to_xyz('mol_b_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
 
     # ADSORPTION
@@ -335,17 +355,17 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
             print('creating folder: {}'.format(path))
             os.makedirs(path)
     for ith, mol_ab in enumerate(representative_mols):
-        mol_ab.to_xyz(path_poll + '/{}.xyz'.format(ith), surf_dots=True,
+        mol_ab.to_xyz(path_poll_w + '/{}.xyz'.format(ith), surf_dots=True,
                       surf_dots_color_by='kmeans', special_surf_dots='kmeans',
                       verbose=False)
-        mol_ab.to_xyz(path_poll_w + '/{}.xyz'.format(ith), verbose=False)
+        mol_ab.to_xyz(path_poll + '/{}.xyz'.format(ith), verbose=False)
 
     # END
     print('+'+'-'*78+'+')
 
 
-# os.chdir('/home/acer/lucas_script/')
-os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
+os.chdir('/home/acer/lucas_script/')
+# os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 cluster_adsorption(args.mols[0],
                    int(args.surf_ks[0]),
