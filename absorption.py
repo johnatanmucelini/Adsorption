@@ -117,10 +117,10 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       help='Sufix of the output folders: '
                       + 'folder_xyz_files+surfix and '
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
-args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-                          + 'arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
-                          + '--surf_ks 25 7 --n_final 100 --surf_d 200 '
-                          + '--n_repeat_km 20 --n_rots 300 '
+args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
+                          + 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
+                          + '--surf_ks 10 30 --n_final 500 --surf_d 300 '
+                          + '--n_repeat_km 20 --n_rots 400 '
                           + '--ovlp_threshold 0.9 --sim_threshold 0.005 '
                           + '--out_sufix _1'
                           ).split())
@@ -163,13 +163,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     for rot in rots:
         rotate_images = np.append(rotate_images, np.dot(keep, rot), axis=0)
     rotate_images = np.array(rotate_images)
-    mean_xyz_value = np.sum(rotate_images, axis=0)
-    if np.any(np.abs(mean_xyz_value) > 1e-4):
-        print('WARNING: rotations may not be uniform enought.'
-              + 'Rotation test x,y,z: {:2.4e} {:2.4e} {:2.4e}'.format(*np.abs(
-                                                            mean_xyz_value))
-              + 'Consider increase the number of ratations by decreasing the '
-              + 'parameter rot_mesh_size')
+    mean_xyz_value = np.abs(np.sum(rotate_images, axis=0))
 
     print('+'+'-'*78+'+')
     print(' {:^76s} '.format(
@@ -185,11 +179,17 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('{:<{}s} {} {}'.format('Surface mapping density',
                                  left, surface_density, 'AA^-2'))
     # rotations
-    print('{:<{}s} {}'.format('N rotations S1', left, n_rots_s1))
-    print('{:<{}s} {}'.format('N rotations S2', left, n_rots_s2))
     print('{:<{}s} {}'.format('N rotations total', left, n_rots))
     if n_rots != n_rot_r:
-        print('{:<{}s} {}'.format('N rotationals requested', left, n_rot_r))
+        print('{:<{}s} {}'.format('N rotations requested', left, n_rot_r))
+    print('{:<{}s} {}'.format('N rotations S2', left, n_rots_s2))
+    print('{:<{}s} {}'.format('N rotations S1', left, n_rots_s1))
+    print('{:<{}s} {:1.2e} {:1.2e} {:1.2e}'.format(
+        'Uniformity deviation', left, *mean_xyz_value))
+    if np.any(mean_xyz_value > 1e-8):
+        print('    WARNING: rotations may not be uniform enought.\n'
+              + '    Please, consider change the number of ratations. If it '
+              + '    persist, please, contact me: johnatan.mucelini@gmail.com')
     # thresholds
     print('{:<{}s} {}'.format('Simility threshold', left, sim_threshold))
     print('{:<{}s} {}'.format('Overlatp threshold', left, ovlp_threshold))
@@ -361,8 +361,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
 
 
-# os.chdir('/home/acer/lucas_script/')
-os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
+os.chdir('/home/acer/lucas_script/')
+#os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 cluster_adsorption(args.mols[0],
                    int(args.surf_ks[0]),

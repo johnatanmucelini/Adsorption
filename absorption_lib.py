@@ -251,7 +251,7 @@ def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
 
 
 class Mol:
-    def __init__(self, path=None, positions=None, cheme=None):
+    def __init__(self, path=None, positions=None, cheme=None, verbose=True):
         self.path = path
         self.positions = positions
         self.cheme = cheme
@@ -265,7 +265,8 @@ class Mol:
 
         # from the path
         if (self.positions is None and self.cheme is None) and self.path is not None:
-            print('Reading mol from {}'.format(self.path))
+            if verbose:
+                print('Reading mol from {}'.format(self.path))
             with open(self.path) as mol_file:
                 lines_as_list = mol_file.readlines()
             self.n = int(lines_as_list[0].split()[0])
@@ -508,5 +509,6 @@ def status(c_all, n_config, c_repeated, c_overlapped, c_accepted, refused_ds):
         c_repeated, c_repeated/c_all))
     print("N structures accepted   {:10d}  {:>8.2%}".format(
         c_accepted, c_accepted/c_all))
-    print("Refused distances quantiles: {:0.3e}, {:0.3e}, {:0.3e}, {:0.3e}, {:0.3e}".format(
-        *np.quantile(np.array(refused_ds), [0, 0.25, 0.5, 0.75, 1])))
+    if len(np.array(refused_ds)) > 1:
+        print("Refused distances quantiles: {:1.2e}, {:1.2e}, {:1.2e}, {:1.2e}, {:1.2e}".format(
+            *np.quantile(np.array(refused_ds), [0, 0.25, 0.5, 0.75, 1])))
