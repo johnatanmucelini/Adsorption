@@ -72,19 +72,13 @@ molecules:
                                   arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz
                            --surf_ks       15 5
                            --n_final        100
-                           --surf_d           5
+                           --surf_d          50
                            --n_repeat_km     20
-                           --rot_mesh_size  0.8
+                           --n_rot          160
                            --ovlp_threshold 0.8
                            --sim_threshold  1.0
                            --out_sufix       _1
 """
-
-# TODO: Metrica tem 2 problemas: 1) tem que usar o inverso da distância, não a
-# distância. 2) tem que definir um máximo de 1. pra caso algum átomo esteja
-# muito perto.
-# TODO: testar o comando do help
-
 
 parser = argparse.ArgumentParser(
     description=help_text, formatter_class=argparse.RawTextHelpFormatter)
@@ -102,17 +96,16 @@ required.add_argument('--n_final', nargs=None, action='store',
                       metavar='N_final', required=True,
                       help='Number of final structures, representative set.')
 optional.add_argument('--surf_d', nargs=None, action='store', metavar='val',
-                      default=5,
-                      help='Density of points over the atoms. (default: 5, '
-                      + 'unity: 4.pi AA^(-2))')
+                      default=50,
+                      help='Density of points over the atoms. (default: 50, '
+                      + 'AA^(-2))')
 optional.add_argument('--n_repeat_km', nargs=None, action='store',
                       metavar='val', default=20,
                       help='Number of times to repeat each clustering. '
                       + '(default: 20)')
-optional.add_argument('--rot_mesh_size', nargs=None, action='store',
-                      metavar='val', default=1.26,
-                      help='Size of the rotations mesh (default: 0.8, change '
-                      + 'it slowly)')
+optional.add_argument('--n_rots', nargs=None, action='store',
+                      metavar='val', default=160,
+                      help='approximatated number of rotations (default: 160)')
 optional.add_argument('--ovlp_threshold', nargs=None, action='store',
                       metavar='val', default=0.8,
                       help='Structures overlap threshold (default: 0.8)')
@@ -126,20 +119,17 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
 args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
                           + 'arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
-                          + '--surf_ks 15 5 --n_final 100 --surf_d 20 '
-                          + '--n_repeat_km 20 --rot_mesh_size 0.8 '
-                          + '--ovlp_threshold 0.8 --sim_threshold 1.0 '
+                          + '--surf_ks 25 7 --n_final 100 --surf_d 200 '
+                          + '--n_repeat_km 20 --n_rots 300 '
+                          + '--ovlp_threshold 0.9 --sim_threshold 0.005 '
                           + '--out_sufix _1'
                           ).split())
 # args = parser.parse_args(['--help'])
 
-# sim_threshold=float(args.sim_threshold),
-# ovlp_threshold=float(args.ovlp_threshold),
-
 
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                        mol_b_surf_km_k, final_n_structures=100, n_km_repeat=20,
-                       surface_density=4, rot_mesh_size=0.8, sim_threshold=1,
+                       surface_density=50, n_rot_r=160, sim_threshold=0.006,
                        ovlp_threshold=0.85, out_sufix=''):
     """It build adsorbed structures between two molecules, mol_a and mol_b.
     Both molecules surface are maped based in a """
@@ -152,15 +142,14 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     surface_km_mol_b_n_repeat = n_km_repeat
 
     # preprocessing all rotations matri
-    n_samples_spher = int(round(2*np.pi*1/rot_mesh_size))
-    n_samples_circ = int(round(4*np.pi*1/rot_mesh_size**2))
-    s2_coords = lib.build_s2_grid(1, n_samples_spher, coords_system='spher')
-    s1_coords = lib.build_s1_grid(1, n_samples_circ, coords_system='circ')
+    n_rots_s1_r = int(round((np.pi*n_rot_r)**(1/3)))
+    n_rots_s2_r = int(round((n_rot_r**2/np.pi)**(1/3)))
+    s2_coords = lib.build_s2_grid(1, n_rots_s1_r, coords_system='spher')
+    s1_coords = lib.build_s1_grid(1, n_rots_s2_r, coords_system='circ')
     rots = lib.build_SO3_from_S1S2(s1_coords, s2_coords)
     n_rots_s1 = len(s1_coords)
     n_rots_s2 = len(s2_coords)
     n_rots = n_rots_s1 * n_rots_s2
-    print('AAA', (n_rots/(8*np.pi**2))**(1./3.))
     n_config = n_rots * surface_km_mol_a_cluster * surface_km_mol_b_cluster
     # test rotations uniformity
     coords_cart = lib.build_s2_grid(1, 100, coords_system='cart')
@@ -177,7 +166,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     mean_xyz_value = np.sum(rotate_images, axis=0)
     if np.any(np.abs(mean_xyz_value) > 1e-4):
         print('WARNING: rotations may not be uniform enought.'
-              + 'Rotation test x,y,z: {:2.4e} {:2.4e} {:2.4e}'.format(np.abs(
+              + 'Rotation test x,y,z: {:2.4e} {:2.4e} {:2.4e}'.format(*np.abs(
                                                             mean_xyz_value))
               + 'Consider increase the number of ratations by decreasing the '
               + 'parameter rot_mesh_size')
@@ -187,22 +176,30 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
         'MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM'))
     print('+'+'-'*78+'+')
     left = 25
-    print('{:<{}s} '.format('PARAMETERS AND INFO:', left))
+    print('{:<{}s} '.format('PARAMETERS:', left))
     print('{:<{}s} {}'.format('Mol A', left, mol_a_path))
     print('{:<{}s} {}'.format('Mol B', left, mol_b_path))
-    print('{:<{}s} {}'.format('N kmeans repetition', left, n_km_repeat))
-    print('{:<{}s} {} {}'.format('Surface mapping density',
-                                 left, surface_density, '[4piAA^{-2}]'))
+    # surface mapping
     print('{:<{}s} {}'.format('N cluster surface A', left, mol_a_surf_km_k))
     print('{:<{}s} {}'.format('N cluster surface B', left, mol_b_surf_km_k))
-    print('{:<{}s} {}'.format('Rotational mesh size', left, rot_mesh_size))
-    print('{:<{}s} {}'.format('Simility threshold', left, sim_threshold))
-    print('{:<{}s} {}'.format('Overlatp threshold', left, ovlp_threshold))
+    print('{:<{}s} {} {}'.format('Surface mapping density',
+                                 left, surface_density, 'AA^-2'))
+    # rotations
     print('{:<{}s} {}'.format('N rotations S1', left, n_rots_s1))
     print('{:<{}s} {}'.format('N rotations S2', left, n_rots_s2))
     print('{:<{}s} {}'.format('N rotations total', left, n_rots))
+    if n_rots != n_rot_r:
+        print('{:<{}s} {}'.format('N rotationals requested', left, n_rot_r))
+    # thresholds
+    print('{:<{}s} {}'.format('Simility threshold', left, sim_threshold))
+    print('{:<{}s} {}'.format('Overlatp threshold', left, ovlp_threshold))
+    # total number of configurations build
     print('{:<{}s} {}'.format('N configurations', left, n_config))
+    # number of final structures
     print('{:<{}s} {}'.format('N final structure', left, final_n_structures))
+    # clustering parameters
+    print('{:<{}s} {}'.format('N kmeans repetition', left, n_km_repeat))
+    # metrics???
 
     # VDW RADII AND ITS REF:
     # Add or edit vdw radii here, see the example bellow:
@@ -364,8 +361,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
 
 
-os.chdir('/home/acer/lucas_script/')
-# os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
+# os.chdir('/home/acer/lucas_script/')
+os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 cluster_adsorption(args.mols[0],
                    int(args.surf_ks[0]),
@@ -374,7 +371,7 @@ cluster_adsorption(args.mols[0],
                    final_n_structures=int(args.n_final),
                    n_km_repeat=int(args.n_repeat_km),
                    surface_density=float(args.surf_d),
-                   rot_mesh_size=float(args.rot_mesh_size),
+                   n_rot_r=int(args.n_rots),
                    sim_threshold=float(args.sim_threshold),
                    ovlp_threshold=float(args.ovlp_threshold),
                    out_sufix=args.out_sufix)

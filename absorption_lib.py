@@ -91,36 +91,15 @@ def build_SO3_from_S1S2(s1_coords, s2_coords):
     return rot_matrix
 
 
-def build_surface(positions, radii, atoms_surface_density=5):
+def build_surface(positions, radii, atoms_surface_density=50):
     """This algorithm classify atoms in surface and core atoms employing the
     concept of atoms as ridge spheres. Then the surface atoms are the ones that
     could be touched by an fictitious adatom that approach the cluster, while
     the core atoms are the remaining atoms.
-    See more of my algorithms im GitHub page Johnatan.mucelini.
-    Articles which employed thi analysis: Mendes P. XXX
-    .
-    Parameters
-    ----------
-    positions: numpy array of floats (n,3) shaped.
-               Cartezian positions of the atoms, in angstroms.
-    radii: numpy array of floats (n,) shaped.
-           Radius of the atoms, in the same order which they appear in
-           positions, in angstroms.
-    ssampling: intiger (optional, default=1000).
-               Quantity of samplings over the touched sphere surface of each
-               atom.
-
-    Return
-    ------
-    dots: numpy array of floats (n,3).
-          The positions of the surface dots, where n is the number of dots.
-    dots_atom: numpy array of floats (n,3).
-               The index of the atom that originate the dot, where n is the
-               number of dots.
     """
 
     # calculation dots positions in surfaces arround each atom
-    trial_n_dots_per_atom = atoms_surface_density * 4 * np.pi * radii**2
+    trial_n_dots_per_atom = atoms_surface_density * radii**2
     n_atoms = len(positions)
     dots_atom = np.empty(0, int)
     n_dots_per_atom = []
@@ -133,7 +112,7 @@ def build_surface(positions, radii, atoms_surface_density=5):
         dots_atom = np.append(dots_atom, np.array([ith] * len(dots_default)))
     n_dots_per_atom = np.array(n_dots_per_atom)
     n_dots = sum(n_dots_per_atom)
-    print('    Initial number of dots per atom: {}'.format(n_dots_per_atom))
+    print('    Surface build N of dots per atom: {}'.format(n_dots_per_atom))
 
     # remove dots inside other atoms touch sphere
     dots_atoms_distance = cdist(positions, dots)
@@ -198,6 +177,7 @@ class Matric_euclidian_mod:
 
     def get_distance(self, features_1, features_2):
         """Distance metric between two samples with features_1 and features_2"""
+        #print(np.linalg.norm(features_1 - features_2))
         return np.linalg.norm(features_1 - features_2)
 
     def get_feature(self, mol, reference=None):
@@ -207,20 +187,22 @@ class Matric_euclidian_mod:
             reference_positions = mol.positions.mean(1)
         else:
             reference_positions = reference
-        dists = []
+
         ucheme = sorted(np.unique(mol.cheme))
-        n_cheme = len(ucheme)
         e_index = mol.cheme == ucheme[0]
-        dists = np.sort(cdist(reference_positions, mol.positions[e_index]))
+
+        features = np.empty((len(reference_positions), 0))
+        new_features = np.empty((len(reference_positions), 0))
         # print('dist1:', dists.shape)
-        for ith in range(1, n_cheme):
-            e_index = mol.cheme == ucheme[ith]
-            dists = np.append(dists, np.sort(cdist(reference_positions, mol.positions[e_index]), axis=1),
-                              axis=1)
+        for ucheme_e in ucheme:
+            ucheme_e_index = mol.cheme == ucheme_e
+            ucheme_e_features = -np.sort(
+                -np.exp(-cdist(reference_positions, mol.positions[ucheme_e_index])**(2/3)), axis=1)
+            features = np.append(features, ucheme_e_features, axis=1)
         if reference is None:
-            result = dists[0]
+            result = features[0]
         else:
-            result = dists
+            result = features
         return result
 
 
@@ -321,7 +303,7 @@ class Mol:
                         print(msg_not_ref.format(cheme, obj[cheme], obj.ref))
         self.radii = np.array(radii)
 
-    def build_surface(self, atoms_surface_density=4):
+    def build_surface(self, atoms_surface_density=50):
         """Map the surface dots positions and its atoms."""
         print("Mapping surface dots arround the atomic structure.")
         dots, dots_atom, area = build_surface(
@@ -520,11 +502,11 @@ def status(c_all, n_config, c_repeated, c_overlapped, c_accepted, refused_ds):
     print('-'*80)
     print("N structures analyzed   {:10d}  {:>8.2%}".format(
         c_all, c_all/n_config))
-    print("N structures accepted   {:10d}  {:>8.2%}".format(
-        c_accepted, c_accepted/c_all))
-    print("N structures repeated   {:10d}  {:>8.2%}".format(
-        c_repeated, c_repeated/c_all))
     print("N structures overlapped {:10d}  {:>8.2%}".format(
         c_overlapped, c_overlapped/c_all))
-    print("Refused distances quantiles: {:0.3e}, {:0.3f}, {:0.3f}, {:0.3f}, {:0.3f}".format(
+    print("N structures repeated   {:10d}  {:>8.2%}".format(
+        c_repeated, c_repeated/c_all))
+    print("N structures accepted   {:10d}  {:>8.2%}".format(
+        c_accepted, c_accepted/c_all))
+    print("Refused distances quantiles: {:0.3e}, {:0.3e}, {:0.3e}, {:0.3e}, {:0.3e}".format(
         *np.quantile(np.array(refused_ds), [0, 0.25, 0.5, 0.75, 1])))
