@@ -126,6 +126,16 @@ args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
                           ).split())
 # args = parser.parse_args(['--help'])
 
+# TODO: implementar as correções que a lucas fez
+# TODO: mol_a -> nome_da_molécula no path
+# TODO: nos tsne add marcadores diferentes para os representativos
+# TODO: nos tsne -> file
+# TODO: clustering -> fiel
+# TODO: legendas bonitas em todas essas figuras
+# TODO: seeds para todos os algoritmos que usem processo aleatórios
+# TODO: warning para caso encontre menos estruturas do que solicitado (pula a clusterização)
+# TODO: aDsorption
+
 
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                        mol_b_surf_km_k, final_n_structures=100, n_km_repeat=20,
