@@ -112,8 +112,10 @@ def sets_comparison(folders, subs_ns):
         i_data = data['features'].values[i_data_index]
         pdists.append(pdist(np.vstack(i_data)))
     pdists = np.array(pdists)
+    print(pdists.shape)
 
     for pdist_row in pdists:
+        print(pdist_row.shape)
         axes[0].hist(pdist_row, density=True, bins=20,
                      range=(np.min(pdists), np.max(pdists)), alpha=0.7)
         print(np.mean(pdist_row))

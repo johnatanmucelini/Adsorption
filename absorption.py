@@ -361,8 +361,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
 
 
-os.chdir('/home/acer/lucas_script/')
-#os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
+#os.chdir('/home/acer/lucas_script/')
+os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 cluster_adsorption(args.mols[0],
                    int(args.surf_ks[0]),
