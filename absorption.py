@@ -2,7 +2,7 @@ import shutil
 import os
 import argparse
 from scipy.spatial.distance import cdist
-from scipy.cluster.vq import kmeans
+from scipy.cluster.vq import kmeans, vq
 import numpy as np
 import absorption_lib as lib
 
@@ -119,10 +119,10 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
 args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
                           + 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-                          + '--surf_ks 10 30 --n_final 500 --surf_d 300 '
-                          + '--n_repeat_km 20 --n_rots 400 '
-                          + '--ovlp_threshold 0.9 --sim_threshold 0.005 '
-                          + '--out_sufix _1'
+                          + '--surf_ks 10 50 --n_final 500 --surf_d 300 '
+                          + '--n_repeat_km 20 --n_rots 60 '
+                          + '--ovlp_threshold 0.50 --sim_threshold 0.08 '
+                          + '--out_sufix _2'
                           ).split())
 # args = parser.parse_args(['--help'])
 
@@ -211,6 +211,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                'As': 1.85, 'Se': 1.90, 'Br': 1.85, 'Kr': 2.02,
                                'Te': 2.06, 'I': 1.98, 'Xe': 2.16,
                                'ref': 'J. Physical Chemistry, 68, 3, 1964'}
+
     # Data with no ref (do not trust it), if employed an warning will raise.
     wdw_atomic_radius_net = {'H': 1.20, 'Tl': 1.96, 'He': 1.40, 'Pb': 2.02,
                              'Li': 1.82, 'C': 1.70, 'Pd': 1.63, 'N': 1.55,
@@ -223,7 +224,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                              'Br': 1.85, 'Kr': 2.02, 'Pt': 1.75, 'Mg': 1.55}
     preference_order = [vdw_atomic_radius_bondi,
                         wdw_atomic_radius_net,
-                        2]
+                        2.0]
     # reading input structures
     print('+'+'-'*78+'+')
     print('READING MOLECULES:')
@@ -275,6 +276,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
 
     for centroid_a in mol_a.surf_dots_km_rep:
         for centroid_b in mol_b.surf_dots_km_rep:
+            c_rot = 0
             for rot in rots:
                 mol_a.translate_by(-centroid_a, image=True)
                 mol_b.translate_by(-centroid_b, image=True)
@@ -303,6 +305,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                         mol_ab.surf_to_real()
                         selected_mols_ab.append(mol_ab)
                         c_accepted += 1
+                        c_rot += 1
 
                     else:
                         c_repeated += 1
@@ -311,9 +314,11 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                     c_overlapped += 1
 
                 c_all += 1
+
                 if (c_all % 10000) == 0:
                     lib.status(c_all, n_config, c_repeated, c_overlapped,
                                c_accepted, refused_ds)
+            # print(c_rot)
 
     lib.status(c_all, n_config, c_repeated,
                c_overlapped, c_accepted, refused_ds)
@@ -332,10 +337,26 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
         if score < top_score:
             top_score = score
             top_centroids = centroids
-    # idx, _ = vq(features, top_centroids)
+    idx, _ = vq(features, top_centroids)
     dists = cdist(top_centroids, features)
     representative_structures_index = np.argmin(dists, axis=1)
     representative_mols = mols_ab[representative_structures_index]
+
+    if True:
+        from sklearn.manifold import TSNE
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1, 1)
+
+        print('t-SNE analysis')
+        features_2d = TSNE(n_components=2, learning_rate='auto',
+                           init='random', random_state=2).fit_transform(features)
+
+        for cluster_index in np.sort(np.unique(idx)):
+            data_indexes = idx == cluster_index
+            x = features_2d[data_indexes, 0]
+            y = features_2d[data_indexes, 1]
+            ax.scatter(x=x, y=y, alpha=0.4)
+        plt.show()
 
     print('+'+'-'*78+'+')
     print('SAVING INFORMATION ')
@@ -361,20 +382,21 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
 
 
-#os.chdir('/home/acer/lucas_script/')
-os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
+os.chdir('/home/acer/lucas_script/')
+#os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
-cluster_adsorption(args.mols[0],
-                   int(args.surf_ks[0]),
-                   args.mols[1],
-                   int(args.surf_ks[1]),
-                   final_n_structures=int(args.n_final),
-                   n_km_repeat=int(args.n_repeat_km),
-                   surface_density=float(args.surf_d),
-                   n_rot_r=int(args.n_rots),
-                   sim_threshold=float(args.sim_threshold),
-                   ovlp_threshold=float(args.ovlp_threshold),
-                   out_sufix=args.out_sufix)
+if __name__ == '__main__':
+    cluster_adsorption(args.mols[0],
+                       int(args.surf_ks[0]),
+                       args.mols[1],
+                       int(args.surf_ks[1]),
+                       final_n_structures=int(args.n_final),
+                       n_km_repeat=int(args.n_repeat_km),
+                       surface_density=float(args.surf_d),
+                       n_rot_r=int(args.n_rots),
+                       sim_threshold=float(args.sim_threshold),
+                       ovlp_threshold=float(args.ovlp_threshold),
+                       out_sufix=args.out_sufix)
 
 # def comparacao_novo_velho(
 #         # inputs

@@ -382,10 +382,14 @@ class Mol:
                   'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
         color_base_surf = []
         color_base_rep = []
-        for c1, c2 in zip(['@', '&'], ['#', '!']):
+        for c1, c2 in zip(['@', '&', '$', '?', '%'], ['#', '!', '+', '-', '*']):
             for le in letras:
                 color_base_surf.append(c1 + le)
                 color_base_rep.append(c2 + le)
+                if False:
+                    color = np.random.rand(3)
+                    print('  1  {}  0.25  0.25  0.25     {:0.3f}    {:0.3f}    {:0.3f}'.format(c1+le, *color))
+                    print('  1  {}  0.40  0.40  0.40     {:0.3f}    {:0.3f}    {:0.3f}'.format(c2+le, *color))
         color_base_surf = np.array(color_base_surf)
         color_base_rep = np.array(color_base_rep)
         surf_index_to_cheme_dict = {}
@@ -455,10 +459,6 @@ class Mol:
                 elif ith == size - 1:
                     #print(element, position)
                     xyz_file.write('{} {} {} {}'.format(element, *position))
-            # print('size:', size, self.n, len(
-            #     self.surf_dots), len(self.surf_dots_km_rep), atoms_cheme)
-            # print('last chemes:', atoms_cheme[-5:])
-            # print('last positions:', atoms_positions[-5:])
 
     def add_atoms(self, elements, positions):
         """Add atoms to the system"""

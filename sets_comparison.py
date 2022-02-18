@@ -23,7 +23,7 @@ required.add_argument('--subs_ns', nargs='*', action='store',
                       help='Split the structure into multiple substructures.'
                       + 'The number of atoms in the molecules must be the sum '
                       + 'of the argurments of subs_ns.')
-args = parser.parse_args(('--folders folder_xyz_files_1 '
+args = parser.parse_args(('--folders folder_xyz_files_2 '
                           + 'arquivos_ref/Cluster_AD_Pd4O8/folder_xyz_files '
                           + '--subs_ns 3 9'
                           ).split())
@@ -89,42 +89,65 @@ def sets_comparison(folders, subs_ns):
             features_data.append(features)
             folder_index_data.append(folder_index)
 
-    # comparação variança das distribuições
+    # analysis
+    import seaborn as sns
+    from sklearn.manifold import TSNE
+    import matplotlib.pyplot as plt
+    from sklearn.cluster import KMeans
+
+    fig, axes = plt.subplots(1, 4)
     data = pd.DataFrame()
     data['features'] = features_data
     data['folder'] = folder_index_data
 
     # t-SNE
-    from sklearn.manifold import TSNE
+    print('t-SNE analysis')
     X = np.vstack(data.features.values)
     features_2d = TSNE(n_components=2, learning_rate='auto',
                        init='random', random_state=2).fit_transform(X)
-
-    # analysis
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    fig, axes = plt.subplots(1, 2)
-
-    pdists = []
-    for i in range(n_folders):
-        i_data_index = data['folder'].values == i
-        i_data = data['features'].values[i_data_index]
-        pdists.append(pdist(np.vstack(i_data)))
-    pdists = np.array(pdists)
-    print(pdists.shape)
-
-    for pdist_row in pdists:
-        print(pdist_row.shape)
-        axes[0].hist(pdist_row, density=True, bins=20,
-                     range=(np.min(pdists), np.max(pdists)), alpha=0.7)
-        print(np.mean(pdist_row))
 
     for i in range(n_folders):
         i_data_index = data['folder'].values == i
         x = features_2d[i_data_index, 0]
         y = features_2d[i_data_index, 1]
         axes[1].scatter(x=x, y=y, alpha=0.4)
+
+    # distances histogram
+    print('Distance histogram')
+    pdists = []
+    for i in range(n_folders):
+        i_data_index = data['folder'].values == i
+        i_data = data['features'].values[i_data_index]
+        pdists.append(pdist(np.vstack(i_data)))
+    pdists = np.array(pdists)
+
+    for pdist_row in pdists:
+        axes[0].hist(pdist_row, density=True, bins=20,
+                     range=(np.min(pdists), np.max(pdists)), alpha=0.7)
+
+    # getting scores
+    print('Clustering sequence')
+    scores = []
+    step = 10
+    ks = np.arange(5, len(i_data)+1, step)
+    n_ks = len(ks)
+    counter = 0
+    for i in range(n_folders):
+        i_data_index = data['folder'].values == i
+        i_data = np.vstack(data['features'].values[i_data_index])
+        scores.append([])
+        for kth, k in enumerate(ks):
+            km = KMeans(n_clusters=k, n_init=10).fit(i_data)
+            scores[-1].append(km.inertia_)
+            counter += 1
+            if (counter % 10) == 0:
+                print('{:2.0%}'.format(counter/(n_ks*n_folders)))
+    scores = np.array(scores)
+    axes[2].plot(ks, scores[0])
+    axes[2].plot(ks, scores[1])
+    axes[3].plot(ks, (scores[0]-scores[1])/scores[1])
+    axes[3].plot(ks, scores[0]-scores[0])
+
     plt.show()
 
     # END
