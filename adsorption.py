@@ -4,7 +4,7 @@ import argparse
 from scipy.spatial.distance import cdist
 from scipy.cluster.vq import kmeans, vq
 import numpy as np
-import absorption_lib as lib
+import adsorption_lib as lib
 
 help_text = """    MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
 
@@ -70,14 +70,14 @@ molecules:
     Usage example:
     $ python absorption.py --mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz
                                   arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz
-                           --surf_ks       15 5
-                           --n_final        100
-                           --surf_d          50
-                           --n_repeat_km     20
-                           --n_rot          160
-                           --ovlp_threshold 0.8
-                           --sim_threshold  1.0
-                           --out_sufix       _1
+                           --surf_ks         5 9
+                           --n_final         100
+                           --surf_d          200
+                           --n_repeat_km      20
+                           --n_rot            60
+                           --ovlp_threshold 0.95
+                           --sim_threshold  0.04
+                           --out_sufix        _2
 """
 
 parser = argparse.ArgumentParser(
@@ -119,22 +119,16 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
 args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
                           + 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-                          + '--surf_ks 10 50 --n_final 500 --surf_d 300 '
-                          + '--n_repeat_km 20 --n_rots 60 '
-                          + '--ovlp_threshold 0.50 --sim_threshold 0.08 '
+                          + '--surf_ks 25 80 --n_final 100 --surf_d 200 '
+                          + '--n_repeat_km 10 --n_rots 60 '
+                          + '--ovlp_threshold 0.95 --sim_threshold 0.04 '
                           + '--out_sufix _2'
                           ).split())
 # args = parser.parse_args(['--help'])
 
 # TODO: implementar as correções que a lucas fez
-# TODO: mol_a -> nome_da_molécula no path
-# TODO: nos tsne add marcadores diferentes para os representativos
-# TODO: nos tsne -> file
-# TODO: clustering -> fiel
 # TODO: legendas bonitas em todas essas figuras
-# TODO: seeds para todos os algoritmos que usem processo aleatórios
-# TODO: warning para caso encontre menos estruturas do que solicitado (pula a clusterização)
-# TODO: aDsorption
+# TODO: list of things do to before update
 
 
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
@@ -236,12 +230,15 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                         wdw_atomic_radius_net,
                         2.0]
     # reading input structures
+    import re
     print('+'+'-'*78+'+')
     print('READING MOLECULES:')
     mol_a = lib.Mol(path=mol_a_path)
+    mol_a_name = re.split('(\.|\/)', mol_a_path)[-3]
     mol_a.centralize()
     mol_a.get_radii(preference_order)
     mol_b = lib.Mol(path=mol_b_path)
+    mol_b_name = re.split('(\.|\/)', mol_b_path)[-3]
     mol_b.centralize()
     mol_b.get_radii(preference_order)
 
@@ -250,9 +247,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('SURFACE MAPPING:')
     mol_a.build_surface(atoms_surface_density=surface_density)
     mol_b.build_surface(atoms_surface_density=surface_density)
-    mol_a.to_xyz('mol_a_surf.xyz', surf_dots=True,
+    mol_a.to_xyz(mol_a_name + '_surf.xyz', surf_dots=True,
                  surf_dots_color_by='atoms')
-    mol_b.to_xyz('mol_b_surf.xyz', surf_dots=True,
+    mol_b.to_xyz(mol_b_name + '_surf.xyz', surf_dots=True,
                  surf_dots_color_by='atoms')
 
     # getting features for the surface dots
@@ -261,14 +258,16 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     mol_b.featurization_surface_dots(metric)
 
     # surface dots Kmeans
-    mol_a.clustering_surface_dots(
-        n_cluster=surface_km_mol_a_cluster, n_repeat=surface_km_mol_a_n_repeat)
-    mol_b.clustering_surface_dots(
-        n_cluster=surface_km_mol_b_cluster, n_repeat=surface_km_mol_b_n_repeat)
+    mol_a.clustering_surface_dots(name=mol_a_name,
+                                  n_cluster=surface_km_mol_a_cluster,
+                                  n_repeat=surface_km_mol_a_n_repeat)
+    mol_b.clustering_surface_dots(name=mol_b_name,
+                                  n_cluster=surface_km_mol_b_cluster,
+                                  n_repeat=surface_km_mol_b_n_repeat)
     print('Surface clustering results:')
-    mol_a.to_xyz('mol_a_km.xyz', surf_dots=True,
+    mol_a.to_xyz(mol_a_name + '_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
-    mol_b.to_xyz('mol_b_km.xyz', surf_dots=True,
+    mol_b.to_xyz(mol_b_name + '_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
 
     # ADSORPTION
@@ -333,40 +332,41 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     lib.status(c_all, n_config, c_repeated,
                c_overlapped, c_accepted, refused_ds)
 
-    # final clustering
-    print('-'*80)
-    print('Selecting representative structures')
-    mols_ab = np.array(selected_mols_ab)
-    features = []
-    for s_mol_ab in mols_ab:
-        features.append(s_mol_ab.features)
-    features = np.array(features)
-    top_score = 1e20
-    for seed in range(n_repeat_final_km):
-        centroids, score = kmeans(features, final_n_structures, seed=seed)
-        if score < top_score:
-            top_score = score
-            top_centroids = centroids
-    idx, _ = vq(features, top_centroids)
-    dists = cdist(top_centroids, features)
-    representative_structures_index = np.argmin(dists, axis=1)
-    representative_mols = mols_ab[representative_structures_index]
+    # testing results, selected_mols_ab size might be lesser than final_n_structures
+    perform_final_clustering = True
+    if len(selected_mols_ab) < final_n_structures:
+        print('-'*80)
+        print('WARNING: The algorithm found {} ({:2.0%}) structure, but {} was requested.'.format(
+            len(selected_mols_ab), len(selected_mols_ab)/final_n_structures, final_n_structures))
+        print('WARNING: Thus, the final clustering is impracticable and will be skipped.')
+        print('TIP: To increase the number of structures, you can:')
+        print('     - increase surf_ks or n_rot: increasing sampling quality.')
+        print('     - decrease ovlp_threshold: increasing the size of the phase-space.')
+        print('     - decrease sim_threshold: increasing the acceptance of structures.')
+        perform_final_clustering = False
 
-    if True:
-        from sklearn.manifold import TSNE
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1, 1)
+    if perform_final_clustering:
+        # final clustering
+        print('-'*80)
+        print('Selecting representative structures')
+        mols_ab = np.array(selected_mols_ab)
+        features = []
+        for s_mol_ab in mols_ab:
+            features.append(s_mol_ab.features)
+        features = np.array(features)
+        top_score = 1e20
+        for seed in range(n_repeat_final_km):
+            centroids, score = kmeans(features, final_n_structures, seed=seed)
+            if score < top_score:
+                top_score = score
+                top_centroids = centroids
+        idx, _ = vq(features, top_centroids)
+        dists = cdist(top_centroids, features)
+        representative_structures_index = np.argmin(dists, axis=1)
+        representative_mols = mols_ab[representative_structures_index]
 
-        print('t-SNE analysis')
-        features_2d = TSNE(n_components=2, learning_rate='auto',
-                           init='random', random_state=2).fit_transform(features)
-
-        for cluster_index in np.sort(np.unique(idx)):
-            data_indexes = idx == cluster_index
-            x = features_2d[data_indexes, 0]
-            y = features_2d[data_indexes, 1]
-            ax.scatter(x=x, y=y, alpha=0.4)
-        plt.show()
+        lib.plot_kmeans_tsne('clustering_representatives' + out_sufix,
+                             features, idx, representative_structures_index)
 
     print('+'+'-'*78+'+')
     print('SAVING INFORMATION ')
@@ -382,7 +382,12 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
             shutil.rmtree(path)
             print('creating folder: {}'.format(path))
             os.makedirs(path)
-    for ith, mol_ab in enumerate(representative_mols):
+
+    if perform_final_clustering:
+        mol_list = representative_mols
+    else:
+        mol_list = selected_mols_ab
+    for ith, mol_ab in enumerate(mol_list):
         mol_ab.to_xyz(path_poll_w + '/{}.xyz'.format(ith), surf_dots=True,
                       surf_dots_color_by='kmeans', special_surf_dots='kmeans',
                       verbose=False)

@@ -206,6 +206,51 @@ class Matric_euclidian_mod:
         return result
 
 
+def plot_kmeans_tsne(name, data, idx, rep_idx):
+    """It save a plot of kmenas result after a t-SNE transformation"""
+
+    from sklearn.manifold import TSNE
+    import matplotlib.pyplot as plt
+    import itertools
+    import seaborn as sns
+    palette = itertools.cycle(sns.color_palette())
+    sns.set()
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6), dpi=160)
+
+    print('    t-SNE feature reduction')
+    features_2d = TSNE(n_components=2, learning_rate='auto',
+                       init='random', random_state=42).fit_transform(data)
+
+    for all_cluster_index, rep_index in zip(range(max(idx)+1), rep_idx):
+        data_indexes = idx == all_cluster_index
+        data_indexes[rep_index] = False
+        #print(rep_idx)
+        color = next(palette)
+        x_rep = features_2d[rep_index, 0]
+        y_rep = features_2d[rep_index, 1]
+        if np.any(data_indexes):
+            x = features_2d[data_indexes, 0]
+            y = features_2d[data_indexes, 1]
+            ax.scatter(x=x, y=y, alpha=0.4, marker='o',
+                       s=35, color=color, zorder=2)
+            for single_data_idx in np.argwhere(data_indexes):
+                xi = features_2d[single_data_idx, 0]
+                yi = features_2d[single_data_idx, 1]
+                xs = np.array([xi, x_rep], float)
+                ys = np.array([yi, y_rep], float)
+                ax.plot(xs, ys,
+                        alpha=0.15, color=color, zorder=1)
+        ax.scatter(x=x_rep, y=y_rep, alpha=1., marker='+',
+                   s=45, color=color, zorder=4)
+        ax.set_title('t-SNE vizualization of Kmeans')
+        ax.set_xlabel('t-SNE coord 1')
+        ax.set_ylabel('t-SNE coord 2')
+        fig.set_tight_layout(True)
+    print('    Writing results to: {}'.format(name + '.png'))
+    fig.savefig(name + '.png')
+
+
 def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
     """Add the image of the molecules in a new molecule"""
     # basic information
@@ -326,7 +371,7 @@ class Mol:
         print("Featurization of the surface dots.")
         self.surf_dots_features = metric.get_feature(self, self.surf_dots)
 
-    def clustering_surface_dots(self, n_cluster, n_repeat=5):
+    def clustering_surface_dots(self, name, n_cluster, n_repeat=5):
         """Calculate the cluster of the surface dots: indexes and centroid
         nearest"""
         print("Clustering of the surface dots.")
@@ -346,6 +391,7 @@ class Mol:
         self.surf_dots_km_rep_kmindex = idx[centroids_nearst_idx]
         self.surf_dots_km_rep_idx = centroids_nearst_idx
         self.surf_dots_km_rep = self.surf_dots[centroids_nearst_idx]
+        plot_kmeans_tsne(name + '_km_tsne', data, idx, centroids_nearst_idx)
 
     def translate_by(self, vector, image=False):
         """Translate atoms and isurf_dots (optional) on any given position."""
@@ -388,8 +434,10 @@ class Mol:
                 color_base_rep.append(c2 + le)
                 if False:
                     color = np.random.rand(3)
-                    print('  1  {}  0.25  0.25  0.25     {:0.3f}    {:0.3f}    {:0.3f}'.format(c1+le, *color))
-                    print('  1  {}  0.40  0.40  0.40     {:0.3f}    {:0.3f}    {:0.3f}'.format(c2+le, *color))
+                    print('  1  {}  0.25  0.25  0.25     {:0.3f}    {:0.3f}    {:0.3f}'.format(
+                        c1+le, *color))
+                    print('  1  {}  0.40  0.40  0.40     {:0.3f}    {:0.3f}    {:0.3f}'.format(
+                        c2+le, *color))
         color_base_surf = np.array(color_base_surf)
         color_base_rep = np.array(color_base_rep)
         surf_index_to_cheme_dict = {}
