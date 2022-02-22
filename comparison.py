@@ -8,7 +8,20 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import adsorption_lib as lib
 
-help_text = """    Compare representative sets"""
+help_text = """COMPARISON SETS OF ATOMIC STRUCTURES
+
+This script read and compare two sets of configurations of an atomic structure,
+such as, molecule, cluster, adsorbed cluster, etc. The atomic structure
+configurations must fulfill a folder and be in xyz format. For adsorbed
+clusters, a better description of each configuration can be employed by
+indicating the number of atoms substructure (in the order that they appear in
+the xyz file). See parameter subs_ns.
+
+Usage example:
+
+$ python comparison.py --folders folder_xyz_files_1 folder_xyz_files_2 \\
+                       folder_xyz_files_3 --subs_ns 3 9
+"""
 
 parser = argparse.ArgumentParser(
     description=help_text, formatter_class=argparse.RawTextHelpFormatter)
@@ -22,13 +35,15 @@ required.add_argument('--folders', nargs='*', action='store',
 optional.add_argument('--subs_ns', nargs='*', action='store',
                       metavar=('n_sub_a', 'n_sub_b'), required=False,
                       help='Split the structure into multiple substructures.\n'
-                      + 'The number of atoms in the molecules must be the \n'
-                      + 'sum of the argurments of subs_ns.')
-args = parser.parse_args(('--folders folder_xyz_files_1 folder_xyz_files_2 '
-                          + 'folder_xyz_files_3 '
-                          + '--subs_ns 3 9'
-                          ).split())
+                      + 'The featurization will consider information from \n'
+                      + 'each substructure. The sum of the number of atom in \n'
+                      + 'each substructure must be the total number of atom.')
+# args = parser.parse_args(('--folders folder_xyz_files_1 folder_xyz_files_2 '
+#                           + 'folder_xyz_files_3 '
+#                           + '--subs_ns 3 9'
+#                           ).split())
 # args = parser.parse_args(['--help'])
+args = parser.parse_args()
 
 
 def sets_comparison(folders, subs_ns):
@@ -37,9 +52,10 @@ def sets_comparison(folders, subs_ns):
     if subs_ns is not None:
         subs_ns = np.array(subs_ns, int)
 
+    # header and parameter
     print('+'+'-'*78+'+')
-    print(' {:^78s} '.format(
-        'MOLECULAR SETS COMPARISION ALGORITHM'))
+    print(' {:<78s} '.format(
+        'COMPARISON SETS OF ATOMIC STRUCTURES'))
     print('+'+'-'*78+'+')
     left = 25
     print('{:<{}s} '.format('PARAMETERS:', left))
@@ -52,39 +68,33 @@ def sets_comparison(folders, subs_ns):
     # reading input structures
     print('+'+'-'*78+'+')
     print('Reading molecules')
-    # when subs_ns is employed we must test mol size
     if subs_ns is not None:
         size_accrd_subs = np.sum(subs_ns)
     n_folders = len(folders)
     list_folderes_mols = []
     n_mim_mol = 1e10
     for ith, folder in enumerate(folders):
-        # print('folder {}'.format(ith))
         folder_mols = []
         for mol_path in os.listdir(folder):
             mol = lib.Mol(path=folder+'/'+mol_path, verbose=0)
-            # comparing molecules sizes with subs_ns
             if subs_ns is not None:
                 mol_size = mol.n
                 if size_accrd_subs != mol_size:
                     print(("ERROR, substructures indicat {} atoms, but {} were "
                            + "found for {}").format(size_accrd_subs, mol_size,
                                                     folder+'/'+mol_path))
-            # adding molecule to the current folder list
             folder_mols.append(mol)
         if len(folder_mols) < n_mim_mol:
             n_mim_mol = len(folder_mols)
-        # adding folder list to the all folder list
         list_folderes_mols.append(folder_mols)
 
     # getting features for the molecules
     print('Getting features')
-    metric = lib.Matric_euclidian_mod()
+    metric = lib.My_matric()
     all_features = []
     all_foder_indexes = []
     list_folder_features = []
     for folder_index, folder_mols in enumerate(list_folderes_mols):
-        # print('folder {}'.format(folder_index))
         folder_features = []
         for mol in folder_mols:
             references = mol.positions.mean(axis=0).reshape(-1, 3)
@@ -116,14 +126,12 @@ def sets_comparison(folders, subs_ns):
     print('    Distance histogram')
     pdists_list = []
     for i in range(n_folders):
-        # print('folder {}'.format(i))
         i_data_index = data['folder'].values == i
         i_data = np.vstack(data['features'].iloc[i_data_index])
         pdists_list.append(pdist(i_data))
     min_val = np.min([np.min(p) for p in pdists_list])
     max_val = np.max([np.max(p) for p in pdists_list])
     for pdist_row, name in zip(pdists_list, folders):
-        # print(pdist_row.shape, pdist_row)
         axes[0].hist(pdist_row, density=True, bins=20,
                      range=(min_val, max_val), alpha=0.4, label=name,
                      zorder=i+2)
@@ -137,7 +145,6 @@ def sets_comparison(folders, subs_ns):
     features_2d = TSNE(n_components=2, learning_rate='auto',
                        init='random', random_state=2).fit_transform(X)
     for i in range(n_folders):
-        # print('folder {}'.format(i))
         i_data_index = data['folder'].values == i
         x = features_2d[i_data_index, 0]
         y = features_2d[i_data_index, 1]
@@ -154,7 +161,6 @@ def sets_comparison(folders, subs_ns):
     n_ks_sum = nstep*n_folders
     ks_fraction = np.arange(1/nstep, 1+1/nstep, 1/nstep)
     for i in range(n_folders):
-        # print('folder {}'.format(i))
         i_data_index = data['folder'].values == i
         i_data = np.vstack(data['features'].iloc[i_data_index])
         scores.append([])
@@ -166,11 +172,6 @@ def sets_comparison(folders, subs_ns):
                 _, score = kmeans(i_data, k, seed=seed)
                 if score < top_score:
                     top_score = score
-                    # top_centroids = centroids
-            # idx, _ = vq(i_data, top_centroids)
-            # dists = cdist(top_centroids, i_data)
-            # centroids_nearst_idx = np.argmin(dists, axis=1)
-
             scores[-1].append(top_score)
             counter += 1
             if (counter % 10) == 0:
@@ -193,8 +194,9 @@ def sets_comparison(folders, subs_ns):
     print('Writing results to: {}'.format(figure_name))
     fig.savefig(figure_name)
 
-    # END
     print('+'+'-'*78+'+')
+    # END
 
 
-sets_comparison(args.folders, args.subs_ns)
+if __name__ == '__main__':
+    sets_comparison(args.folders, args.subs_ns)

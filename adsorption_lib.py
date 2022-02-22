@@ -7,11 +7,22 @@ from scipy.cluster.hierarchy import single, fcluster
 from scipy.spatial.distance import pdist
 from scipy.cluster.vq import kmeans, vq
 
-NOTE_FOR_ = """
+NOTE_LESS_THAN_REQUESTED = """
 +------------------------------------------------------------------------------+
 | WARNING: The algorithm found {:>4d} ({:>3.0%}) structure, but {:>4d} were requested.  |
 | WARNING: Thus, the final clustering is impracticable and will be skipped.    |
 | To increase the number of structures, you can:                               |
+| - increase surf_ks or n_rot -> increasing sampling quality                   |
+| - decrease ovlp_threshold   -> increasing the size of the phase-space        |
+| - decrease sim_threshold    -> similarity filter will accept more structures |
++------------------------------------------------------------------------------+
+"""
+
+NOTE_EQUAL_TO_REQUESTED = """
++------------------------------------------------------------------------------+
+| WARNING: The algorithm found exactly {:>4d} structure, as requested.          |
+| WARNING: Thus, the final clustering is impracticable and will be skipped.    |
+| If you wish to increase the number of structures, you can:                   |
 | - increase surf_ks or n_rot -> increasing sampling quality                   |
 | - decrease ovlp_threshold   -> increasing the size of the phase-space        |
 | - decrease sim_threshold    -> similarity filter will accept more structures |
@@ -163,33 +174,8 @@ def build_surfac_func(cheme, positions, radii, atoms_surface_density=10):
     return dots, dots_atom, area
 
 
-class Matric_euclidian:
-    """Euclidian metrics tools"""
-
-    def get_distance(self, features_1, features_2):
-        """Distance metric between two samples with features_1 and features_2"""
-        dividendo = np.sum((features_1 - features_2)**2, axis=0)
-        divisor = np.sum(features_1**2 + features_2**2, axis=0)
-        return (dividendo/divisor) * 1E6
-
-    def get_feature(self, mol, reference=None):
-        """calculates the euclidian distances features for the molecules or for a
-        reference point in space"""
-        features = []
-        if reference is None:
-            reference_positions = mol.positions.mean(1)
-        else:
-            reference_positions = reference
-        dists = np.sort(cdist(reference_positions, mol.positions))
-        if reference is None:
-            result = dists[0]
-        else:
-            result = dists
-        return result
-
-
-class Matric_euclidian_mod:
-    """Euclidian metrics tools"""
+class My_matric:
+    """This object provide a metric employed in the algorithm"""
 
     def get_distance(self, features_1, features_2):
         """Distance metric between two samples with features_1 and features_2"""
@@ -236,7 +222,8 @@ def plot_kmeans_tsne(name, data, idx, rep_idx):
 
     print('    t-SNE feature reduction')
     features_2d = TSNE(n_components=2, learning_rate='auto',
-                       init='random', random_state=42).fit_transform(data)
+                       init='random', random_state=42, n_iter=5000,
+                       n_iter_without_progress=500).fit_transform(data)
 
     for all_cluster_index, rep_index in zip(range(max(idx)+1), rep_idx):
         data_indexes = idx == all_cluster_index

@@ -6,78 +6,81 @@ from scipy.cluster.vq import kmeans, vq
 import numpy as np
 import adsorption_lib as lib
 
-help_text = """    MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
+help_text = """MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
 
-    This script find representative structures for the adsorption between two
-molecules:
-    (1) Read the mol and associate a vdw radii for each atom:
-        There are vdw radii for some atoms and its reference, but other can be
-        added manualy, search for "VDW RADII AND ITS REF" in this document.
-    (2) Both molecules surfaces are mapped to find representative point:
-        The surface of a molecule is a outside surface built with the union of
-        ridge spheres of vdw radii around each atom. The files mol_a_surf.xyz
-        and mol_b_surf.xyz present this data [a].
+For a given pair of atomic structures, the present algorithm generates sets of
+adsorbed configurations, considering ridge structures and atoms as spheres of
+VDW radius (which could overlap regulated):
+
+(1) Read the mol and associate VDW radii for each atom:
+    There are VDW radii for some atoms and their reference, but others can be
+    added manually, search for "VDW RADII AND ITS REF" in this document.
+
+(2) Both molecule surfaces are mapped to find representative points:
+    The surface of a molecule is an outside surface built with the union of
+    ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and
+    mol_b_surf.xyz present this data [a].
         Points in these spheres (SO2) are obtained with the algorithm described
-        by Deserno (see the article "How to generate equidistributed points on
-        the surface of a sphere" [b]).
-        Then, for each point of the surface, features are extracted. The
-        features vector contain the sorted distaces from the point to each atom
-        of the molecule, saparataded by the atoms chemical element.
-        Based in a K-means clustering, the surface dots are clusters/groups,
-        and the point nearest to the centroind of its clusters is selected as
-        its representative point in the molecular surface. The files
-        mol_a_km.xyz and mol_b_km.xyz present this data [a].
-        [a] The structure with the surface dots can be see in VESTA code. To
-            correct read they data, you must replace the VESTA configuration
-            file elements.ini by the elements.ini file added in the project.
-            These file present the types of atoms, colors, and other properties
-            to automatically add colors to the representation. In the surf.xyz
-            files present the surface dots colorized for each atoms associated
-            to the surface point. The km.xyz files present the surface dots
-            colorized for each clusters of surface dots.
-        [b] https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf
-    code. You can also read it with the surface dots in colors:
-    (3) Adsorption are performed combining both molecules by each pair of
-        representative point of its surfaces. Also, for each pair or
-        representative points, many rotations are performed to garantee that
-        good matches between the molecules.
-        These rotations are performed with a grid of rotations of SO3, obtained
-        with a method called Successive Orthogonal Images on SOn. The method
-        was first presented by Mitchell (DOI:10.1137/030601879), but in my
-        implementation I followed the paper by Yershova
-        (DOI:10.1177/0278364909352700).
-        Thus, the number of adsorbed molecules configurations to analyze is
-        deterministic, and is product of the number of clusters in the surface
-        of each molecule and the number of rotations in SO3.
-        The configurations are added to a pull of structures, if: (i) the
-        molecules did not overlapped in the adsorption, which is considered
-        when a pair of atoms of different molecules were distant by less than
-        the sum of vdw radii of the atoms multiplied by the parameter
-        ovlp_threshold; (ii) the present structures is considerably differnt
-        from the other structures in the pull. To check it, we build a feature
-        vector with the sorted distaces between three key points and each atom,
-        separated by atom type and key point. The key points are the
-        geometrical center of each molecule and the position of the
-        representative surface dots that were employed to create the present
-        configuration. If the euclidian distance between the present
-        configuration and all other structures in the pull were smaller than
-        sim_threshold parameter.
-    (4) Representative structures are sampled from the poll with another
-        K-means, and the structures are writed in folder_xyz_files (adsorbed
-        sturctures) and folder_xyz_files_withsurfs (adsorbed structures with
-        surface information).
+    by Deserno (see the article "How to generate equidistributed points on the
+    surface of a sphere" [b]). Then, for each point of the surface, features
+    are extracted. The features vector contains the sorted distances from the
+    point to each atom of the molecule, separated by the chemical element of
+    the atoms. Based on a K-means clustering, the surface dots are
+    clusters/groups, and the point nearest to the centroid of its clusters is
+    selected as its representative point in the molecular surface. The files
+    mol_a_km.xyz and mol_b_km.xyz present this data [a].
+        [a] The structure with the surface dots can be seen in the VESTA code.
+    To correct read their data, you must replace the VESTA configuration file
+    elements.ini with the elements.ini file added in the present project. These
+    files present the types of atoms, colors, and other properties to
+    automatically add colors to the representation. In the surf.xyz files
+    present the surface dots with a color for the points associated with each
+    atom. The km.xyz files present the surface dots with a color for the points
+    associated with each cluster of surface dots.
+        [b] Article: https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf.
 
-    Usage example:
-    $ python absorption.py --mols arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz
-                                  arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz
-                           --surf_ks         5 9
-                           --n_final         100
-                           --surf_d           10
-                           --n_repeat_km      20
-                           --n_rot            60
-                           --ovlp_threshold 0.95
-                           --sim_threshold  0.04
-                           --out_sufix        _2
+    (3) Adsorption is performed by combining both molecules by each pair of the
+    representative point of its surfaces. Also, for each pair of representative
+    points, many rotations are performed to guarantee good matches between the
+    molecules. These rotations are performed with a grid of rotations of SO3,
+    obtained with a method called Successive Orthogonal Images on SOn. The
+    method was first presented by Mitchell (DOI:10.1137/030601879), but for the
+    present implementation I followed the paper by Yershova
+    (DOI:10.1177/0278364909352700).
+        Thus, the number of adsorbed molecules configurations to analyze is
+    deterministic and is the product of the number of surface clusters for each
+    molecule and the number of rotations in SO3. The configurations are added
+    to a pull of structures when:
+        (i) The molecules did not overlap in the adsorption, which is
+    considered to have happened when a pair of atoms of different molecules
+    were distant by less than the sum of their VDW radii multiplied by the
+    parameter ovlp_threshold;
+        (ii) The present structures is not similar to any one in the in the
+    pull of structure, which is verify with a simple filtering. The adsorbed
+    configurations are featurized with a method similar to the surface points.
+    First, the distances between three key points and each atom are calculated
+    and sorted, keeping separations by each atom type and key point. The key
+    points are the geometrical center of each molecule and the position of the
+    representative surface dots that were employed to create the present
+    configuration. If the euclidian distance between the present configuration
+    and all other structures in the pull were smaller than sim_threshold
+    parameter.
+
+(4) Representative structures are sampled from the poll with another K-means,
+    and the structures are written in folder_xyz_files (adsorbed structures)
+    and folder_xyz_files_withsurfs (adsorbed structures with surface
+    information).
+
+Usage example:
+$ python adsorption.py --mols cluster.xyz molecule.xyz \\
+                       --surf_ks         5 9           \\
+                       --n_final         100           \\
+                       --surf_d           10           \\
+                       --n_repeat_km      20           \\
+                       --n_rot            60           \\
+                       --ovlp_threshold 0.95           \\
+                       --sim_threshold  0.04           \\
+                       --out_sufix        _2
 """
 
 parser = argparse.ArgumentParser(
@@ -90,7 +93,7 @@ required.add_argument('--mols', nargs=2, action='store',
                       help='The two molecules to adsorb.')
 required.add_argument('--surf_ks', nargs=2, action='store',
                       metavar=('K_a', 'K_b'), required=True,
-                      help='Numbers k (kmeans) for each surface dots '
+                      help='Numbers k (K-means) for each surface dots '
                       + 'clustering')
 required.add_argument('--n_final', nargs=None, action='store',
                       metavar='N_final', required=True,
@@ -108,28 +111,28 @@ optional.add_argument('--n_rots', nargs=None, action='store',
                       metavar='val', default=60,
                       help='approximatated number of rotations (default: 60)')
 optional.add_argument('--ovlp_threshold', nargs=None, action='store',
-                      metavar='val', default=0.04,
-                      help='Structures overlap threshold (default: 0.04)')
-optional.add_argument('--sim_threshold', nargs=None, action='store',
                       metavar='val', default=0.9,
-                      help='Structures similarity threshold (default: 0.9)')
+                      help='Structures overlap threshold (default: 0.9)')
+optional.add_argument('--sim_threshold', nargs=None, action='store',
+                      metavar='val', default=0.04,
+                      help='Structures similarity threshold (default: 0.04)')
 optional.add_argument('--out_sufix', nargs=None, action='store',
                       metavar='sufix', default='',
                       help='Sufix of the output folders: '
                       + 'folder_xyz_files+surfix and '
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
-args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
-                          + 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-                          + '--surf_ks 10 40 --n_final 1000 --surf_d 10 '
-                          + '--n_repeat_km 10 --n_rots 60 '
-                          + '--ovlp_threshold 0.90 --sim_threshold 0.04 '
-                          + '--out_sufix _3'
-                          ).split())
+# args = parser.parse_args(('--mols molecule.xyz cluster.xyz '
+#                           + '--surf_ks 10 40 --n_final 505 --surf_d 10 '
+#                           + '--n_repeat_km 10 --n_rots 60 '
+#                           + '--ovlp_threshold 0.90 --sim_threshold 0.04 '
+#                           + '--out_sufix _3'
+#                           ).split())
 # args = parser.parse_args(['--help'])
+args = parser.parse_args()
 
-# TODO: implementar as correções que a lucas fez
-# TODO: legendas bonitas em todas essas figuras
-# TODO: list of things do to before update
+# list of things do to before release a new version for lucas:
+# 1) comment/uncomment parser.parse_args above
+# 2) comment os.chdir(paths) in the end on the document
 
 
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
@@ -146,7 +149,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     surface_km_mol_a_n_repeat = n_km_repeat
     surface_km_mol_b_n_repeat = n_km_repeat
 
-    # preprocessing all rotations matri
+    # preprocessing all rotations matrix
     n_rots_s1_r = int(round((np.pi*n_rot_r)**(1/3)))
     n_rots_s2_r = int(round((n_rot_r**2/np.pi)**(1/3)))
     s2_coords = lib.build_s2_grid(1, n_rots_s1_r, coords_system='spher')
@@ -156,7 +159,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     n_rots_s2 = len(s2_coords)
     n_rots = n_rots_s1 * n_rots_s2
     n_config = n_rots * surface_km_mol_a_cluster * surface_km_mol_b_cluster
-    # test rotations uniformity
+    # testing rotations uniformity
     coords_cart = lib.build_s2_grid(1, 100, coords_system='cart')
     keep = []
     for cart in coords_cart:
@@ -170,8 +173,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     rotate_images = np.array(rotate_images)
     mean_xyz_value = np.abs(np.sum(rotate_images, axis=0))
 
+    # header
     print('+'+'-'*78+'+')
-    print(' {:^78s} '.format(
+    print(' {:<78s} '.format(
         'MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM'))
     print('+'+'-'*78+'+')
     left = 25
@@ -195,16 +199,13 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
         print('    WARNING: rotations may not be uniform enought.\n'
               + '    Please, consider change the number of ratations. If it '
               + '    persist, please, contact me: johnatan.mucelini@gmail.com')
-    # thresholds
+    # threshold
     print('{:<{}s} {}'.format('Simility threshold', left, sim_threshold))
     print('{:<{}s} {}'.format('Overlatp threshold', left, ovlp_threshold))
-    # total number of configurations build
+    # others
     print('{:<{}s} {}'.format('N configurations', left, n_config))
-    # number of final structures
     print('{:<{}s} {}'.format('N final structure', left, final_n_structures))
-    # clustering parameters
     print('{:<{}s} {}'.format('N kmeans repetition', left, n_km_repeat))
-    # metrics???
 
     # VDW RADII AND ITS REF:
     # Add or edit vdw radii here, see the example bellow:
@@ -215,20 +216,20 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                'P': 1.80, 'S': 1.80, 'Cl': 1.75, 'Ar': 1.88,
                                'As': 1.85, 'Se': 1.90, 'Br': 1.85, 'Kr': 2.02,
                                'Te': 2.06, 'I': 1.98, 'Xe': 2.16}
-
     # Data with no ref (do not trust it), if employed an warning will raise.
-    wdw_atomic_radius_net = {'H': 1.20, 'Tl': 1.96, 'He': 1.40, 'Pb': 2.02,
-                             'Li': 1.82, 'C': 1.70, 'Pd': 1.63, 'N': 1.55,
-                             'Ag': 1.72, 'O': 1.52, 'Cd': 1.58, 'F': 1.47,
-                             'In': 1.93, 'Ne': 1.54, 'Sn': 2.17, 'Na': 2.27,
-                             'Mn': 1.73, 'Tu': 2.06, 'Ur': 1.86, 'I': 1.98,
-                             'Si': 2.10, 'Xe': 2.16, 'P': 1.80, 'S': 1.80,
-                             'Cl': 1.75, 'K': 2.75, 'Ni': 1.63, 'Co': 1.40,
-                             'Zi': 1.39, 'Ga': 1.87, 'Ar': 1.85, 'Se': 1.90,
-                             'Br': 1.85, 'Kr': 2.02, 'Pt': 1.75, 'Mg': 1.55}
+    wdw_atomic_radius_no_ref = {'H': 1.20, 'Tl': 1.96, 'He': 1.40, 'Pb': 2.02,
+                                'Li': 1.82, 'C': 1.70, 'Pd': 1.63, 'N': 1.55,
+                                'Ag': 1.72, 'O': 1.52, 'Cd': 1.58, 'F': 1.47,
+                                'In': 1.93, 'Ne': 1.54, 'Sn': 2.17, 'Na': 2.27,
+                                'Mn': 1.73, 'Tu': 2.06, 'Ur': 1.86, 'I': 1.98,
+                                'Si': 2.10, 'Xe': 2.16, 'P': 1.80, 'S': 1.80,
+                                'Cl': 1.75, 'K': 2.75, 'Ni': 1.63, 'Co': 1.40,
+                                'Zi': 1.39, 'Ga': 1.87, 'Ar': 1.85, 'Se': 1.90,
+                                'Br': 1.85, 'Kr': 2.02, 'Pt': 1.75, 'Mg': 1.55}
     preference_order = [vdw_atomic_radius_bondi,
-                        wdw_atomic_radius_net,
+                        wdw_atomic_radius_no_ref,
                         2.0]
+
     # reading input structures
     import re
     print('+'+'-'*78+'+')
@@ -253,18 +254,18 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                  surf_dots_color_by='atoms')
 
     # getting features for the surface dots
-    metric = lib.Matric_euclidian_mod()
+    metric = lib.My_matric()
     mol_a.featurization_surface_dots(metric)
     mol_b.featurization_surface_dots(metric)
 
-    # surface dots Kmeans
+    # surface dots clustering
     mol_a.clustering_surface_dots(name=mol_a_name,
                                   n_cluster=surface_km_mol_a_cluster,
                                   n_repeat=surface_km_mol_a_n_repeat)
     mol_b.clustering_surface_dots(name=mol_b_name,
                                   n_cluster=surface_km_mol_b_cluster,
                                   n_repeat=surface_km_mol_b_n_repeat)
-    print('Surface clustering results:')
+    # surface dots clustering results:
     mol_a.to_xyz(mol_a_name + '_km.xyz', surf_dots=True,
                  surf_dots_color_by='kmeans', special_surf_dots='kmeans')
     mol_b.to_xyz(mol_b_name + '_km.xyz', surf_dots=True,
@@ -296,7 +297,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                     mol_ab = lib.add_mols(mol_a, mol_b, image=True)
                     refs = np.array([mol_a.ipositions.mean(
                         axis=0), mol_b.ipositions.mean(axis=0), np.zeros(3)])
-                    metric = lib.Matric_euclidian_mod()
+                    metric = lib.My_matric()
                     mol_ab.features = metric.get_feature(
                         mol_ab, reference=refs).flatten()
                     repeated = False
@@ -332,15 +333,19 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     lib.status(c_all, n_config, c_repeated,
                c_overlapped, c_accepted, refused_ds)
 
-    # testing results, selected_mols_ab size might be lesser than final_n_structures
+    # testing if the number of obtained molecules are larger or equal to de
+    # requested number of structures
     perform_final_clustering = True
     if len(selected_mols_ab) < final_n_structures:
-        print(lib.NOTE_FOR_.format(len(selected_mols_ab), len(
+        print(lib.NOTE_LESS_THAN_REQUESTED.format(len(selected_mols_ab), len(
             selected_mols_ab)/final_n_structures, final_n_structures))
         perform_final_clustering = False
+    elif len(selected_mols_ab) == final_n_structures:
+        print(lib.NOTE_EQUAL_TO_REQUESTED.format(len(selected_mols_ab)))
+        perform_final_clustering = False
 
+    # final clustering
     if perform_final_clustering:
-        # final clustering
         print('-'*80)
         print('Selecting representative structures')
         mols_ab = np.array(selected_mols_ab)
@@ -358,13 +363,12 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
         dists = cdist(top_centroids, features)
         representative_structures_index = np.argmin(dists, axis=1)
         representative_mols = mols_ab[representative_structures_index]
-
         lib.plot_kmeans_tsne('clustering_representatives' + out_sufix,
                              features, idx, representative_structures_index)
 
+    # saving structures
     print('+'+'-'*78+'+')
     print('SAVING INFORMATION ')
-    # saving structures
     path_poll_w = 'folder_xyz_files{}_withsurfs/'.format(out_sufix)
     path_poll = 'folder_xyz_files{}/'.format(out_sufix)
     for path in [path_poll, path_poll_w]:
@@ -376,7 +380,6 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
             shutil.rmtree(path)
             print('creating folder: {}'.format(path))
             os.makedirs(path)
-
     if perform_final_clustering:
         mol_list = representative_mols
     else:
@@ -387,12 +390,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                       verbose=False)
         mol_ab.to_xyz(path_poll + '/{}.xyz'.format(ith), verbose=False)
 
-    # END
     print('+'+'-'*78+'+')
+    # END
 
-
-#os.chdir('/home/acer/lucas_script/')
-#os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 if __name__ == '__main__':
     cluster_adsorption(args.mols[0],
@@ -406,14 +406,3 @@ if __name__ == '__main__':
                        sim_threshold=float(args.sim_threshold),
                        ovlp_threshold=float(args.ovlp_threshold),
                        out_sufix=args.out_sufix)
-
-# def comparacao_novo_velho(
-#         # inputs
-#         folder de todos os xyz encontrados novo
-#         folder de todos os xyz encontrados velho):
-#     - pega os resultados dos metodos
-#     - t-SNE map pra reduzir a dimensionalidade
-#     - comparação das distribuições
-#     - para todas as moléculas que forem encontradas
-#     - para todas as moléculas selecionadas
-#     - para todas as moléculas selecionadas
