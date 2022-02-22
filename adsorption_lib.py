@@ -7,6 +7,17 @@ from scipy.cluster.hierarchy import single, fcluster
 from scipy.spatial.distance import pdist
 from scipy.cluster.vq import kmeans, vq
 
+NOTE_FOR_ = """
++------------------------------------------------------------------------------+
+| WARNING: The algorithm found {:>4d} ({:>3.0%}) structure, but {:>4d} were requested.  |
+| WARNING: Thus, the final clustering is impracticable and will be skipped.    |
+| To increase the number of structures, you can:                               |
+| - increase surf_ks or n_rot -> increasing sampling quality                   |
+| - decrease ovlp_threshold   -> increasing the size of the phase-space        |
+| - decrease sim_threshold    -> similarity filter will accept more structures |
++------------------------------------------------------------------------------+
+"""
+
 
 def build_s2_grid(radius, n_sample_init, coords_system='cart'):
     """Generate a (almost) regular grid on the surface of sphere of given radius.
@@ -91,7 +102,7 @@ def build_SO3_from_S1S2(s1_coords, s2_coords):
     return rot_matrix
 
 
-def build_surface(positions, radii, atoms_surface_density=50):
+def build_surfac_func(cheme, positions, radii, atoms_surface_density=10):
     """This algorithm classify atoms in surface and core atoms employing the
     concept of atoms as ridge spheres. Then the surface atoms are the ones that
     could be touched by an fictitious adatom that approach the cluster, while
@@ -99,20 +110,25 @@ def build_surface(positions, radii, atoms_surface_density=50):
     """
 
     # calculation dots positions in surfaces arround each atom
-    trial_n_dots_per_atom = atoms_surface_density * radii**2
+    trial_n_dots_per_atom = atoms_surface_density * 4 * np.pi * radii**2
     n_atoms = len(positions)
     dots_atom = np.empty(0, int)
     n_dots_per_atom = []
     dots = np.empty((0, 3), float)
-    for ith in range(n_atoms):
+    cheme_n_dots_per_atom_dict = {}
+    for ith, ele in enumerate(cheme):
         dots_default = build_s2_grid(1, trial_n_dots_per_atom[ith])
         dots = np.append(
             dots, positions[ith] + dots_default * (radii[ith] + 1e-4), axis=0)
         n_dots_per_atom.append(len(dots_default))
         dots_atom = np.append(dots_atom, np.array([ith] * len(dots_default)))
+        if ele not in cheme_n_dots_per_atom_dict.keys():
+            cheme_n_dots_per_atom_dict[ele] = len(dots_default)
     n_dots_per_atom = np.array(n_dots_per_atom)
     n_dots = sum(n_dots_per_atom)
-    print('    Surface build N of dots per atom: {}'.format(n_dots_per_atom))
+    for key in cheme_n_dots_per_atom_dict.keys():
+        print('    Initial N of dots per {:<2s} {:>5d}'.format(
+            key, cheme_n_dots_per_atom_dict[key]))
 
     # remove dots inside other atoms touch sphere
     dots_atoms_distance = cdist(positions, dots)
@@ -329,31 +345,35 @@ class Mol:
         msg_not_ref = "    Atom {}, vdw radii {}, missing reference!\n" \
             "        WARNING: missing reference!\n" \
             "        Add a vdw radii a it ref in adsorption.py, line 99."
-        radii = []
-        for cheme in self.cheme:
+
+        cheme_radii_dict = {}
+        for u_cheme in np.unique(self.cheme):
             found = False
             for obj in atoms_radii_preferences:
                 if not found:
                     if isinstance(obj, dict):
-                        if cheme in obj.keys():
-                            radii.append(obj[cheme])
+                        if u_cheme in obj.keys():
+                            cheme_radii_dict[u_cheme] = obj[u_cheme]
                             found = True
                             if 'ref' in obj.keys():
                                 print(msg_ref.format(
-                                    cheme, obj[cheme], obj['ref']))
+                                    u_cheme, obj[u_cheme], obj['ref']))
                             else:
-                                print(msg_not_ref.format(cheme, obj[cheme]))
+                                print(msg_not_ref.format(
+                                    u_cheme, obj[u_cheme]))
                     if isinstance(obj, int):
-                        radii.append(obj)
+                        cheme_radii_dict[u_cheme] = obj[u_cheme]
                         found = True
-                        print(msg_not_ref.format(cheme, obj[cheme], obj.ref))
-        self.radii = np.array(radii)
+                        print(msg_not_ref.format(
+                            u_cheme, obj[u_cheme], obj.ref))
+        self.radii = np.array([cheme_radii_dict[ele] for ele in self.cheme])
 
-    def build_surface(self, atoms_surface_density=50):
+    def build_surface(self, atoms_surface_density=10):
         """Map the surface dots positions and its atoms."""
         print("Mapping surface dots arround the atomic structure.")
-        dots, dots_atom, area = build_surface(
-            self.positions, self.radii, atoms_surface_density=atoms_surface_density)
+        dots, dots_atom, area = build_surfac_func(
+            self.cheme, self.positions, self.radii,
+            atoms_surface_density=atoms_surface_density)
         self.surf_dots = dots
         self.surf_dots_atom = dots_atom
         self.surf_atoms_index, counts = np.unique(
@@ -362,9 +382,10 @@ class Mol:
         self.surf_atoms_positions = self.positions[self.surf_atoms_index]
         self.surf_atoms_raddii = self.radii[self.surf_atoms_index]
         # area:
-        print('    N surface points {:7d}'.format(len(dots)))
-        print('    Surface area      {:10.3f} AA'.format(area))
-        print('    Points density    {:10.3f} AA^-1'.format(len(dots)/area))
+        print('    N surface points       {:7d}'.format(len(dots)))
+        print('    Surface area            {:10.3f} AA'.format(area))
+        print(
+            '    Points density          {:10.3f} AA^-1'.format(len(dots)/area))
 
     def featurization_surface_dots(self, metric):
         """Calculate the features for each dot."""

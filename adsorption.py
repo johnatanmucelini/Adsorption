@@ -72,7 +72,7 @@ molecules:
                                   arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz
                            --surf_ks         5 9
                            --n_final         100
-                           --surf_d          200
+                           --surf_d           10
                            --n_repeat_km      20
                            --n_rot            60
                            --ovlp_threshold 0.95
@@ -94,24 +94,25 @@ required.add_argument('--surf_ks', nargs=2, action='store',
                       + 'clustering')
 required.add_argument('--n_final', nargs=None, action='store',
                       metavar='N_final', required=True,
-                      help='Number of final structures, representative set.')
+                      help=('Number of final structures, in the representative'
+                            + ' set.'))
 optional.add_argument('--surf_d', nargs=None, action='store', metavar='val',
-                      default=50,
-                      help='Density of points over the atoms. (default: 50, '
+                      default=10,
+                      help='Density of points over the atoms. (default: 10, '
                       + 'AA^(-2))')
 optional.add_argument('--n_repeat_km', nargs=None, action='store',
                       metavar='val', default=20,
                       help='Number of times to repeat each clustering. '
                       + '(default: 20)')
 optional.add_argument('--n_rots', nargs=None, action='store',
-                      metavar='val', default=160,
-                      help='approximatated number of rotations (default: 160)')
+                      metavar='val', default=60,
+                      help='approximatated number of rotations (default: 60)')
 optional.add_argument('--ovlp_threshold', nargs=None, action='store',
-                      metavar='val', default=0.8,
-                      help='Structures overlap threshold (default: 0.8)')
+                      metavar='val', default=0.04,
+                      help='Structures overlap threshold (default: 0.04)')
 optional.add_argument('--sim_threshold', nargs=None, action='store',
-                      metavar='val', default=1.,
-                      help='Structures similarity threshold (default: 1)')
+                      metavar='val', default=0.9,
+                      help='Structures similarity threshold (default: 0.9)')
 optional.add_argument('--out_sufix', nargs=None, action='store',
                       metavar='sufix', default='',
                       help='Sufix of the output folders: '
@@ -119,10 +120,10 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
                       + 'folder_xyz_files_withsurfs+surfix (default: None)')
 args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
                           + 'arquivos_ref/Cluster_AD_Pd4O8/cluster.xyz '
-                          + '--surf_ks 25 80 --n_final 100 --surf_d 200 '
+                          + '--surf_ks 10 40 --n_final 1000 --surf_d 10 '
                           + '--n_repeat_km 10 --n_rots 60 '
-                          + '--ovlp_threshold 0.95 --sim_threshold 0.04 '
-                          + '--out_sufix _2'
+                          + '--ovlp_threshold 0.90 --sim_threshold 0.04 '
+                          + '--out_sufix _3'
                           ).split())
 # args = parser.parse_args(['--help'])
 
@@ -132,9 +133,9 @@ args = parser.parse_args(('--mols arquivos_ref/Cluster_AD_Pd4O8/molecule.xyz '
 
 
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
-                       mol_b_surf_km_k, final_n_structures=100, n_km_repeat=20,
-                       surface_density=50, n_rot_r=160, sim_threshold=0.006,
-                       ovlp_threshold=0.85, out_sufix=''):
+                       mol_b_surf_km_k, final_n_structures, n_km_repeat,
+                       surface_density, n_rot_r, sim_threshold,
+                       ovlp_threshold, out_sufix=''):
     """It build adsorbed structures between two molecules, mol_a and mol_b.
     Both molecules surface are maped based in a """
 
@@ -170,7 +171,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     mean_xyz_value = np.abs(np.sum(rotate_images, axis=0))
 
     print('+'+'-'*78+'+')
-    print(' {:^76s} '.format(
+    print(' {:^78s} '.format(
         'MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM'))
     print('+'+'-'*78+'+')
     left = 25
@@ -207,14 +208,13 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
 
     # VDW RADII AND ITS REF:
     # Add or edit vdw radii here, see the example bellow:
-    # ref: THE JOURNAL OF PHYSICAL CHEMISTRY, 68, 3, 1964
-    # In agrement with J. Phys. Chem., Vol. 100, No. 18, 1996
-    vdw_atomic_radius_bondi = {'H': 1.20, 'He': 1.40, 'C': 1.70, 'N': 1.55,
+    # ref: The Journal of Physical Chemistry, 68, 3, 1964
+    vdw_atomic_radius_bondi = {'ref': 'J. Physical Chemistry, 68, 3, 1964',
+                               'H': 1.20, 'He': 1.40, 'C': 1.70, 'N': 1.55,
                                'O': 1.52, 'F': 1.47, 'Ne': 1.54, 'Si': 2.10,
                                'P': 1.80, 'S': 1.80, 'Cl': 1.75, 'Ar': 1.88,
                                'As': 1.85, 'Se': 1.90, 'Br': 1.85, 'Kr': 2.02,
-                               'Te': 2.06, 'I': 1.98, 'Xe': 2.16,
-                               'ref': 'J. Physical Chemistry, 68, 3, 1964'}
+                               'Te': 2.06, 'I': 1.98, 'Xe': 2.16}
 
     # Data with no ref (do not trust it), if employed an warning will raise.
     wdw_atomic_radius_net = {'H': 1.20, 'Tl': 1.96, 'He': 1.40, 'Pb': 2.02,
@@ -335,14 +335,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     # testing results, selected_mols_ab size might be lesser than final_n_structures
     perform_final_clustering = True
     if len(selected_mols_ab) < final_n_structures:
-        print('-'*80)
-        print('WARNING: The algorithm found {} ({:2.0%}) structure, but {} was requested.'.format(
-            len(selected_mols_ab), len(selected_mols_ab)/final_n_structures, final_n_structures))
-        print('WARNING: Thus, the final clustering is impracticable and will be skipped.')
-        print('TIP: To increase the number of structures, you can:')
-        print('     - increase surf_ks or n_rot: increasing sampling quality.')
-        print('     - decrease ovlp_threshold: increasing the size of the phase-space.')
-        print('     - decrease sim_threshold: increasing the acceptance of structures.')
+        print(lib.NOTE_FOR_.format(len(selected_mols_ab), len(
+            selected_mols_ab)/final_n_structures, final_n_structures))
         perform_final_clustering = False
 
     if perform_final_clustering:
@@ -397,7 +391,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
 
 
-os.chdir('/home/acer/lucas_script/')
+#os.chdir('/home/acer/lucas_script/')
 #os.chdir('C:\\Users\\User\\Documents\\GitHub\\lucas_script\\')
 
 if __name__ == '__main__':
