@@ -8,6 +8,9 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import adsorption_lib as lib
 
+
+
+
 help_text = """COMPARISON SETS OF ATOMIC STRUCTURES
 
 This script read and compare two sets of configurations of an atomic structure,
@@ -76,7 +79,11 @@ def sets_comparison(folders, subs_ns):
     for ith, folder in enumerate(folders):
         folder_mols = []
         for mol_path in os.listdir(folder):
-            mol = lib.Mol(path=folder+'/'+mol_path, verbose=0)
+            try:
+                mol = lib.Mol(path=folder+'/'+mol_path, verbose=0)
+            except:
+                print('Erro while read the mol: {}'.format(mol_path))
+
             if subs_ns is not None:
                 mol_size = mol.n
                 if size_accrd_subs != mol_size:

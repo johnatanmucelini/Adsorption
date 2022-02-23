@@ -58,7 +58,7 @@ A vizualization of the clustering process is indicated in the file clustering_re
 
 ![](.figures/clustering_representatives_2.png)
 
-## Runnig the code
+### Run code example
 
 Example with required arguments:
 ```bash
@@ -72,6 +72,22 @@ $ cd example
 $ python ../adsorption.py --mols cluster.xyz molecule.xyz --surf_ks 30 10 --n_final 100 --surf_d 10 --n_repeat_km 20 --n_rot 100 --ovlp_threshold 0.90 --sim_threshold  0.04 --out_sufix _2
 ```
 
-## Compare different sets
+## Comparison of representative sets
 
-The tool x
+The script comparison.py allow to compare multiple sets of adsorbed molecules, for instance, generated with different parameters. It read the molecules in the xyz format, in saparated folders, and get features for they. The features are the same of the employed in the adsorption step described above, if the size of the adsorbed molecules presented in the order of the xyz file. Otherwise, it employs a single key point, the geometric center of the system, which should decrease the quality of the description of the features.
+
+Then, few analysis/plots are performed with this data:
+- A histogram of distances among the samples;
+- A t-SNE dimensionality reduction;
+- A sequence of K-means clustering, increasing K/data size de approximatated 0 a 1.
+
+The results are saved to a file named result_comparison.png:
+
+![](.figures/result_comparison.png)
+
+### Run code example
+
+```bash
+$ cd example
+$ python ../comparison.py --folders set_1 set_2 set_3 set_4 set_5 --subs_ns 9 3
+```

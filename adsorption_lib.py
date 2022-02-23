@@ -222,7 +222,7 @@ def plot_kmeans_tsne(name, data, idx, rep_idx):
 
     print('    t-SNE feature reduction')
     features_2d = TSNE(n_components=2, learning_rate='auto',
-                       init='random', random_state=42, n_iter=5000,
+                       init='random', random_state=42, n_iter=3000,
                        n_iter_without_progress=500).fit_transform(data)
 
     for all_cluster_index, rep_index in zip(range(max(idx)+1), rep_idx):
