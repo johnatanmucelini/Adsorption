@@ -8,9 +8,6 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import adsorption_lib as lib
 
-
-
-
 help_text = """COMPARISON SETS OF ATOMIC STRUCTURES
 
 This script read and compare two sets of configurations of an atomic structure,

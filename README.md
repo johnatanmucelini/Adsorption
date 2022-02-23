@@ -5,8 +5,6 @@ The present algorithm generates sets of atomic structures of adsorbed molecules,
 | A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **=** | AB_1.xyz ![](.figures/99.png)  AB_2.xyz ![](.figures/97.png) ... |
 |----------------------------------|-------|----------------------------------|-----|------------------------------------------------------------------|
 
----
-
 ## Methodology
 
 Our methods mimic the ideia that two melecules could interact based on different chemical environments on the surface of the molecules. First, it get a representative sets of chemical environments of each one of the molecules. Second, we find structures combining the molecules through each possible pair of chemical environments in the molecules. Finally, this poll of structures is sampled to find a representative set of thepossible ways of interaction.
@@ -57,6 +55,15 @@ Finaly, the structures in poll are clusterized with K-means yielding a represent
 A vizualization of the clustering process is indicated in the file clustering_representatives*.png.
 
 ![](.figures/clustering_representatives_2.png)
+
+## Required packages
+
+- numpy
+- scipy
+- argparse
+- pandas
+- sklearn
+- matplotlib
 
 ### Run code example
 

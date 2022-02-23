@@ -1,4 +1,4 @@
-"""Tool employed to the absorption """
+"""Tools employed in the absorption and comparison scripts."""
 
 import sys
 import numpy as np
@@ -6,6 +6,10 @@ from scipy.spatial.distance import cdist
 from scipy.cluster.hierarchy import single, fcluster
 from scipy.spatial.distance import pdist
 from scipy.cluster.vq import kmeans, vq
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+import itertools
+import seaborn as sns
 
 NOTE_LESS_THAN_REQUESTED = """
 +------------------------------------------------------------------------------+
@@ -211,10 +215,6 @@ class My_matric:
 def plot_kmeans_tsne(name, data, idx, rep_idx):
     """It save a plot of kmenas result after a t-SNE transformation"""
 
-    from sklearn.manifold import TSNE
-    import matplotlib.pyplot as plt
-    import itertools
-    import seaborn as sns
     palette = itertools.cycle(sns.color_palette())
     sns.set()
 
