@@ -2,7 +2,7 @@
 
 The present algorithm generates sets of atomic structures of adsorbed molecules, considering ridge structures and atoms as spheres of VDW radius (or a fraction of it).
 
-| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **=** | AB_1.xyz ![](.figures/99.png)  AB_2.xyz ![](.figures/97.png) ... |
+| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **>>>** | AB_1.xyz ![](.figures/99.png)  AB_2.xyz ![](.figures/97.png) ... |
 |----------------------------------|-------|----------------------------------|-----|------------------------------------------------------------------|
 
 ## Methodology
@@ -43,7 +43,7 @@ A configurations is added to a pull when:
  - The present structures is not similar to any one in the in the pull of structure, which is verify with a simple filtering. The adsorbed configurations are featurized with a method similar to the surface points. First, the distances between three key points and each atom are calculated and sorted, keeping separations by each atom type and key point. The key points are the geometrical center of each molecule and the position of the representative surface dots that were employed to create the present configuration. If the euclidian distance between the present configuration and all other structures in the pull were smaller than sim_threshold parameter.
 
 Example structures:
----
+
 | ![](.figures/97.png) | ![](.figures/97_surf_km.png)
 |---------------------|-----------------------------|
 | ![](.figures/99.png) | ![](.figures/99_surf_km.png)
@@ -56,7 +56,9 @@ A vizualization of the clustering process is indicated in the file clustering_re
 
 ![](.figures/clustering_representatives_2.png)
 
-## Required packages
+## The code
+
+#### Required packages
 
 - numpy
 - scipy
@@ -65,7 +67,7 @@ A vizualization of the clustering process is indicated in the file clustering_re
 - sklearn
 - matplotlib
 
-### Run code example
+#### Running the code
 
 Example with required arguments:
 ```bash
@@ -92,7 +94,7 @@ The results are saved to a file named result_comparison.png:
 
 ![](.figures/result_comparison.png)
 
-### Run code example
+### Running the code
 
 ```bash
 $ cd example
