@@ -15,14 +15,14 @@ Our methods mimic the ideia that two melecules could interact based on different
 
 The objective of this step is to get a set of K points on the surface of each molecule, these points must represent the diversity of different chemical environments around the molecule:
 
-- 1) Read the mol and associate VDW radii for each atom:
+- Read the mol and associate VDW radii for each atom:
     There are VDW radii for some atoms and their reference, but others can be
     added manually, search for "VDW RADII AND ITS REF" in this document.
 
-- 2) Both molecule surfaces are mapped with dots:
+- Both molecule surfaces are mapped with dots:
     The surface of a molecule is an outside surface built with the union of  ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and mol_b_surf.xyz present this data [a]. Points in these spheres (SO2) are obtained with the algorithm describedby Deserno (see the article "How to generate equidistributed points on the surface of a sphere", https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf).
 
-- 3) Featurize, clusterize and find representative dots among the surface dots.
+- Featurize, clusterize and find representative dots among the surface dots.
     For each point of the surface, features are extracted. The features vector contains the sorted distances from the point to each atom of the molecule, separated by the chemical element of the atoms. Based on a K-means clustering, the surface dots are clusters/groups, and the point nearest to the centroid of its clusters is selected as its representative point in the molecular surface. The files mol_a_km.xyz and mol_b_km.xyz present this data [a].
 
 | Input structures (*.xyz)   | ![](.figures/cluster.png)      | ![](.figures/molecule.png)
@@ -33,7 +33,7 @@ The objective of this step is to get a set of K points on the surface of each mo
 
 The \*_surf.xyz files present the surface dots with a color for the points associated with each atom. The \*_km.xyz files present the surface dots with a color for the points associated with each cluster of surface dots. Similar colors of different figure have no relation with each other.
 
-The structure with the surface dots can be seen in the VESTA code.To correct read their data, you must replace the VESTA configuration file *elements.ini* with the *elements.ini* file added in the present project. These files present the types of atoms, colors, and other properties to automatically add colors to the representation.
+The structure with the surface dots can be seen in the [VESTA](https://jp-minerals.org/vesta/en/download.html) code. To correct read their data, you must replace the VESTA configuration file *elements.ini* with the *elements.ini* file added in the present project. These files present the types of atoms, colors, and other properties to automatically add colors to the representation.
 
 #### Adsorption
 
@@ -56,7 +56,6 @@ Example structures:
 Finaly, the structures in poll are clusterized with K-means yielding a representative set. The structures are written in folder_xyz_files (adsorbed structures) and folder_xyz_files_withsurfs (adsorbed structures with surface information).
 A vizualization of the clustering process is indicated in the file clustering_representatives*.png.
 
-
 ![](.figures/clustering_representatives_2.png)
 
 ## Runnig the code
@@ -72,3 +71,7 @@ Example with all arguments:
 $ cd example
 $ python ../adsorption.py --mols cluster.xyz molecule.xyz --surf_ks 30 10 --n_final 100 --surf_d 10 --n_repeat_km 20 --n_rot 100 --ovlp_threshold 0.90 --sim_threshold  0.04 --out_sufix _2
 ```
+
+## Compare different sets
+
+The tool x
