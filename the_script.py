@@ -1,3 +1,16 @@
+# <!-- ```bash
+# $ python the_script.py top_folder
+# ``` -->
+# <!-- Esse script, atualmente, procura todas as pastas começando na pasta do argumento e analiza todas as pastas que tiverem dentro dela
+#
+# - Ignora as pastas os com status **ok** (o nome da pasta termina em **\*_ok**);
+#
+# - Ignora as pastas que não tenham os arquivos basicos de um cálculo do *orca*;
+#
+# - Analiza as pastas que tenha arquivos **\*.xyz**, **\*.imp**, e **slurm-\*.out**:
+#   - Copia a esturtura do arquivo **\*.xyz** para o arquivo **\*.imp**;
+#
+#   - Lê os arquivos **slurm-\*.out**, e verifica se o último arquivo apresenta a mensagem de convergência -->
 
 from sys import argv as sys_argv
 from os import walk as os_walk
@@ -139,7 +152,7 @@ def analyse_folders(folder_path, verbose=1):
             new_path = old_path + '_ok'
             if verbose > 0:
                 print("geometry optimization converged")
-            os_rename(old_path, new_path )
+            os_rename(old_path, new_path)
             if verbose > 0:
                 print("{} -> {}".format(old_path, new_path))
 

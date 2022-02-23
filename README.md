@@ -1,9 +1,15 @@
 # MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
 
-For a given pair of atomic structures, the present algorithm generates sets of
-adsorbed configurations, considering ridge structures and atoms as spheres of
-VDW radius (which could overlap regulated). First, a surface mapping is
-performed, than, based on the mapping the adsorption are performed.
+The present algorithm generates sets of atomic structures of adsorbed molecules, considering ridge structures and atoms as spheres of VDW radius (or a fraction of it).
+
+| A.xyz ![](.figures/cluster.png)  | +| B.xyz ![](.figures/molecule.png) | = | AB_1.xyz ![](.figures/99.png)  AB_2.xyz ![](.figures/97.png) ... |
+|----|----|--|--| |
+
+---
+
+## Methodology
+
+Our methods mimic the ideia that two melecules could interact based on different chemical environments on the surface of the molecules. First, it get a representative sets of chemical environments of each one of the molecules. Second, we find structures combining the molecules through each possible pair of chemical environments in the molecules. Finally, this poll of structures is sampled to find a representative set of thepossible ways of interaction.
 
 #### Surface Mapping
 
@@ -19,11 +25,11 @@ The objective of this step is to get a set of K points on the surface of each mo
 - 3) Featurize, clusterize and find representative dots among the surface dots.
     For each point of the surface, features are extracted. The features vector contains the sorted distances from the point to each atom of the molecule, separated by the chemical element of the atoms. Based on a K-means clustering, the surface dots are clusters/groups, and the point nearest to the centroid of its clusters is selected as its representative point in the molecular surface. The files mol_a_km.xyz and mol_b_km.xyz present this data [a].
 
-| Input structures (*.xyz)   | ![](example/cluster.png)      | ![](example/molecule.png)
+| Input structures (*.xyz)   | ![](.figures/cluster.png)      | ![](.figures/molecule.png)
 |---------------------------|-------------------------------|---------------------------
-| Surface dots (*_surf.xyz)         | ![](example/cluster_surf.png) | ![](example/molecule_surf.png)
-| Surface dots clustering (*_km.xyz) | ![](example/cluster_km.png)   | ![](example/molecule_km.png)
-| Clustering in t-SNE reduced features | ![](example/cluster_km_tsne.png) | ![](example/molecule_km_tsne.png)
+| **Surface dots (*_surf.xyz)**         | ![](.figures/cluster_surf.png) | ![](.figures/molecule_surf.png)
+| **Surface dots clustering (*_km.xyz)** | ![](.figures/cluster_km.png)   | ![](.figures/molecule_km.png)
+| **Clustering in t-SNE reduced features** | ![](.figures/cluster_km_tsne.png) | ![](.figures/molecule_km_tsne.png)
 
 The \*_surf.xyz files present the surface dots with a color for the points associated with each atom. The \*_km.xyz files present the surface dots with a color for the points associated with each cluster of surface dots. Similar colors of different figure have no relation with each other.
 
@@ -39,18 +45,19 @@ A configurations is added to a pull when:
  - The present structures is not similar to any one in the in the pull of structure, which is verify with a simple filtering. The adsorbed configurations are featurized with a method similar to the surface points. First, the distances between three key points and each atom are calculated and sorted, keeping separations by each atom type and key point. The key points are the geometrical center of each molecule and the position of the representative surface dots that were employed to create the present configuration. If the euclidian distance between the present configuration and all other structures in the pull were smaller than sim_threshold parameter.
 
 Example structures:
-
-| ![](example/97.png) | ![](example/97_surf_km.png)
+---
+| ![](.figures/97.png) | ![](.figures/97_surf_km.png)
 |---------------------|-----------------------------|
-| ![](example/99.png) | ![](example/99_surf_km.png)
-| ![](example/98.png) | ![](example/98_surf_km.png)
+| ![](.figures/99.png) | ![](.figures/99_surf_km.png)
+| ![](.figures/98.png) | ![](.figures/98_surf_km.png)
 
-## Representative set sampling
+#### Representative set extraction
 
 Finaly, the structures in poll are clusterized with K-means yielding a representative set. The structures are written in folder_xyz_files (adsorbed structures) and folder_xyz_files_withsurfs (adsorbed structures with surface information).
 A vizualization of the clustering process is indicated in the file clustering_representatives*.png.
 
-![](example/clustering_representatives_2.png)
+
+![](.figures/clustering_representatives_2.png)
 
 ## Runnig the code
 
@@ -65,17 +72,3 @@ Example with all arguments:
 $ cd example
 $ python ../adsorption.py --mols cluster.xyz molecule.xyz --surf_ks 30 10 --n_final 100 --surf_d 10 --n_repeat_km 20 --n_rot 100 --ovlp_threshold 0.90 --sim_threshold  0.04 --out_sufix _2
 ```
-
-<!-- ```bash
-$ python the_script.py top_folder
-``` -->
-<!-- Esse script, atualmente, procura todas as pastas começando na pasta do argumento e analiza todas as pastas que tiverem dentro dela
-
-- Ignora as pastas os com status **ok** (o nome da pasta termina em **\*_ok**);
-
-- Ignora as pastas que não tenham os arquivos basicos de um cálculo do *orca*;
-
-- Analiza as pastas que tenha arquivos **\*.xyz**, **\*.imp**, e **slurm-\*.out**:
-  - Copia a esturtura do arquivo **\*.xyz** para o arquivo **\*.imp**;
-
-  - Lê os arquivos **slurm-\*.out**, e verifica se o último arquivo apresenta a mensagem de convergência -->
