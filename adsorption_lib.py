@@ -524,7 +524,11 @@ class Mol:
         if 'ipositions' in dir(self):
             self.ipositions = np.append(self.ipositions, positions, axis=0)
 
-    def surf_to_real(self):
+    def image_to_real_with_surf(self):
+        """Copy the image vars of ipositions, isurf_dots and isurf_dots_km_rep
+        to they analog real vars positions, surf_dots and surf_dots_km_rep."""
+
+        # verify if it indeed present image vars
         if 'ipositions' in dir(self):
             # print('to_real', len(self.positions), len(self.ipositions))
             self.positions = self.ipositions * 1.
