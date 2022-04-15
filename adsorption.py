@@ -1,7 +1,6 @@
 import shutil
 import os
 import os.path
-import re
 import argparse
 from scipy.spatial.distance import cdist
 from scipy.cluster.vq import kmeans, vq
@@ -22,8 +21,9 @@ VDW radius (which could overlap regulated):
     The surface of a molecule is an outside surface built with the union of
     ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and
     mol_b_surf.xyz present this data [a].
-        Points in these spheres (SO2) are obtained with the algorithm described
-    by Deserno (see the article "How to generate equidistributed points on the
+
+    Points in these spheres (SO2) are obtained with the algorithm described by
+    Deserno (see the article "How to generate equidistributed points on the
     surface of a sphere" [b]). Then, for each point of the surface, features
     are extracted. The features vector contains the sorted distances from the
     point to each atom of the molecule, separated by the chemical element of
@@ -48,28 +48,28 @@ VDW radius (which could overlap regulated):
     molecules. These rotations are performed with a grid of rotations of SO3,
     obtained with a method called Successive Orthogonal Images on SOn. The
     method was first presented by Mitchell (DOI:10.1137/030601879), but for the
-    present implementation I followed the paper by Yershova
+    present implementation, I followed the paper by Yershova
     (DOI:10.1177/0278364909352700).
         Thus, the number of adsorbed molecules configurations to analyze is
     deterministic and is the product of the number of surface clusters for each
     molecule and the number of rotations in SO3. The configurations are added
     to a pull of structures when:
-        (i) The molecules did not overlap in the adsorption, which is
-    considered to have happened when a pair of atoms of different molecules
-    were distant by less than the sum of their VDW radii multiplied by the
-    parameter ovlp_threshold;
-        (ii) The present structures is not similar to any one in the in the
-    pull of structure, which is verify with a simple filtering. The adsorbed
-    configurations are featurized with a method similar to the surface points.
-    First, the distances between three key points and each atom are calculated
-    and sorted, keeping separations by each atom type and key point. The key
-    points are the geometrical center of each molecule and the position of the
-    representative surface dots that were employed to create the present
-    configuration. If the euclidian distance between the present configuration
-    and all other structures in the pull were smaller than sim_threshold
-    parameter.
+        (i) The molecule did not overlap in the adsorption, which is considered
+        to have happened when a pair of atoms of different molecules were
+        distant by less than the sum of their VDW radii multiplied by the
+        parameter ovlp_threshold;
+        (ii) The molecule is not similar to any other in the pull of structure,
+        which is verified with a simple filter. Calculate the features vectors
+        for a molecule as follows: a) three references are calculated, the
+        geometrical center of the molecules and their touch contact.
+        b) calculate the distance between references and positions,
+        c) calculate a slow-decay function of these distance values, d) sort
+        these results, for each reference and chemical element. The slow-decay
+        function is exp(-dist**(2/3)). If the euclidian distance between the
+        present configuration and all other structures in the pull were smaller
+        than sim_threshold parameter.
 
-(4) Representative structures are sampled from the poll with another K-means,
+(4) Representative structures are sampled from the pool with another K-means,
     and the structures are written in folder_xyz_files (adsorbed structures)
     and folder_xyz_files_withsurfs (adsorbed structures with surface
     information).
@@ -90,42 +90,40 @@ $ python adsorption.py --mols cluster.xyz molecule.xyz \\
 parser = argparse.ArgumentParser(
     description=help_text, formatter_class=argparse.RawTextHelpFormatter)
 parser._action_groups.pop()
-required = parser.add_argument_group('required arguments')
-optional = parser.add_argument_group('optional arguments')
-required.add_argument('--mols', nargs=2, action='store',
-                      metavar=('a.xyz', 'b.xyz'), required=True,
-                      help='The two molecules to adsorb.')
-required.add_argument('--surf_ks', nargs=2, action='store',
-                      metavar=('K_a', 'K_b'), required=True,
-                      help='Numbers k (K-means) for each surface dots '
-                      + 'clustering')
-required.add_argument('--n_final', nargs=None, action='store',
-                      metavar='N_final', required=True,
-                      help=('Number of final structures, in the representative'
-                            + ' set.'))
-optional.add_argument('--surf_d', nargs=None, action='store', metavar='val',
-                      default=10,
-                      help='Density of points over the atoms. (default: 10, '
-                      + 'AA^(-2))')
-optional.add_argument('--n_repeat_km', nargs=None, action='store',
-                      metavar='val', default=20,
-                      help='Number of times to repeat each clustering. '
-                      + '(default: 20)')
-optional.add_argument('--n_rots', nargs=None, action='store',
-                      metavar='val', default=60,
-                      help='approximatated number of rotations (default: 60)')
-optional.add_argument('--ovlp_threshold', nargs=None, action='store',
-                      metavar='val', default=0.9,
-                      help='Structures overlap threshold (default: 0.9)')
-optional.add_argument('--sim_threshold', nargs=None, action='store',
-                      metavar='val', default=0.04,
-                      help='Structures similarity threshold (default: 0.04)')
-optional.add_argument('--out_sufix', nargs=None, action='store',
-                      metavar='sufix', default='',
-                      help='Sufix of the output folders: '
-                      + 'folder_xyz_files+surfix and '
-                      + 'folder_xyz_files_withsurfs+surfix (default: None)')
-                      args = parser.parse_args()
+req = parser.add_argument_group('required arguments')
+opt = parser.add_argument_group('optional arguments')
+req.add_argument('--mols', nargs=2, action='store', metavar=('a.xyz', 'b.xyz'),
+                 required=True, help='The two molecules to adsorb.')
+req.add_argument('--surf_ks', nargs=2, action='store', metavar=('K_a', 'K_b'),
+                 required=True,
+                 help='Numbers k (K-means) for each surface dots clustering')
+req.add_argument('--n_final', nargs=None, action='store',
+                 metavar='N_final', required=True,
+                 help=('Number of final structures, in the representative set.'
+                       ))
+opt.add_argument('--surf_d', nargs=None, action='store', metavar='val',
+                 default=10,
+                 help='Density of points over the atoms. (default: 10, '
+                 + 'AA^(-2))')
+opt.add_argument('--n_repeat_km', nargs=None, action='store', metavar='val',
+                 default=20,
+                 help='Number of times to repeat each clustering. (default: '
+                      + '20)')
+opt.add_argument('--n_rots', nargs=None, action='store', metavar='val',
+                 default=60,
+                 help='approximatated number of rotations (default: 60)')
+opt.add_argument('--ovlp_threshold', nargs=None, action='store', metavar='val',
+                 default=0.9,
+                 help='Structures overlap threshold (default: 0.9)')
+opt.add_argument('--sim_threshold', nargs=None, action='store', metavar='val',
+                 default=0.04,
+                 help='Structures similarity threshold (default: 0.04)')
+opt.add_argument('--out_sufix', nargs=None, action='store', metavar='sufix',
+                 default='',
+                 help='Sufix of the output folders:  folder_xyz_files+surfix '
+                      + 'and folder_xyz_files_withsurfs+surfix (default: None)'
+                 )
+args = parser.parse_args()
 
 # Example or argument
 # argument = '--mols molecule.xyz cluster.xyz --surf_ks 10 40 --n_final 505 ' +
@@ -134,7 +132,7 @@ optional.add_argument('--out_sufix', nargs=None, action='store',
 # args = parser.parse_args(argument.split())
 # args = parser.parse_args(['--help'])
 
-# the contral function of the algorithm
+
 def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                        mol_b_surf_km_k, final_n_structures, n_km_repeat,
                        surface_density, n_rot_r, sim_threshold,
@@ -154,7 +152,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     n_rots_s2_r = int(round((n_rot_r**2/np.pi)**(1/3)))
     s2_coords = lib.build_s2_grid(1, n_rots_s1_r, coords_system='spher')
     s1_coords = lib.build_s1_grid(1, n_rots_s2_r, coords_system='circ')
-    rots = lib.build_SO3_from_S1S2(s1_coords, s2_coords)
+    rots = lib.build_s3_from_s1s2(s1_coords, s2_coords)
     n_rots_s1 = len(s1_coords)
     n_rots_s2 = len(s2_coords)
     n_rots = n_rots_s1 * n_rots_s2
@@ -179,7 +177,6 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     #     print('    WARNING: rotations may not be uniform enought.\n'
     #           + '    Please, consider change the number of ratations. If it '
     #           + '    persist, please, contact me: johnatan.mucelini@gmail.com')
-
 
     # Printing Header: parameters and important numbers
     left = 25
@@ -211,7 +208,7 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('{:<{}s} {}'.format('N final structure', left, final_n_structures))
     print('{:<{}s} {}'.format('N kmeans repetition', left, n_km_repeat))
 
-    # VDW RADII and its references:
+    # VDW RADII:
     # Add or edit vdw radii here, see the example bellow:
     # ref: The Journal of Physical Chemistry, 68, 3, 1964
     vdw_atomic_radius_bondi = {'ref': 'J. Physical Chemistry, 68, 3, 1964',
@@ -257,9 +254,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                  surf_dots_color_by='atoms')
 
     # getting features for the surface dots
-    metric = lib.My_matric()
-    mol_a.featurization_surface_dots(metric)
-    mol_b.featurization_surface_dots(metric)
+    mol_a.featurization_surface_dots()
+    mol_b.featurization_surface_dots()
 
     # surface dots clustering
     mol_a.clustering_surface_dots(name=mol_a_name,
@@ -316,9 +312,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                      np.zeros(3)])
 
                     # Computing the features
-                    metric = lib.My_matric()  # TODO: isso poderia ser criado uma única vez?
-                    mol_ab.features = metric.get_feature(
-                        mol_ab, reference=refs).flatten()
+                    # TODO: isso poderia ser criado uma única vez?
+                    mol_ab.features = lib.get_feature(mol_ab,
+                                                      reference=refs).flatten()
 
                     # Checking repetition on the pool of structures
                     repeated = False
@@ -326,8 +322,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                     for a_mol_ab in filtered_pool:
                         # calculating the distance between the current and
                         # already selected structures
-                        dist = metric.get_distance(
-                            mol_ab.features, a_mol_ab.features)
+                        dist = lib.get_distance(mol_ab.features,
+                                                a_mol_ab.features)
                         # Checking if the distance < similarity threshold
                         if dist < sim_threshold:
                             repeated = True
@@ -335,91 +331,103 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
 
                     # if the molecule is unprecedented in the filtered_pool
                     if not repeated:
-                        # build the molecule (with surface info!)
-                        mol_ab_accepted = lib.add_mols(
+                        # build the molecule AB, with surface info
+                        mol_ab_acc = lib.add_mols(
                             mol_a, mol_b, image=True, add_surf_info=True)
-                        # calculate the features again  TODO: can i just repeat from previous mol_ab?
+                        # TODO: can i just repeat from previous mol_ab?
+                        # calculate the features again
                         # mol_ab.features = metric.get_feature(
-                            # mol_ab, reference=refs).flatten()
-                        mol_ab_accepted.features = mol_ab.features *1.
-                        mol_ab_accepted.image_to_real_with_surf()
-                        filtered_pool.append(mol_ab_accepted)
-                        #
+                        # mol_ab, reference=refs).flatten()
+                        mol_ab_acc.features = mol_ab.features * 1.
+                        mol_ab_acc.image_to_real_with_surf()
+                        filtered_pool.append(mol_ab_acc)
+
                         c_accepted += 1
                         c_rot += 1
-
                     else:
                         c_repeated += 1
                         refused_ds.append(dist)
                 else:
                     c_overlapped += 1
-
                 c_all += 1
 
                 if (c_all % 10000) == 0:
                     lib.status(c_all, n_config, c_repeated, c_overlapped,
                                c_accepted, refused_ds)
-            # print(c_rot)
-
     lib.status(c_all, n_config, c_repeated,
                c_overlapped, c_accepted, refused_ds)
 
-    # testing if the number of obtained molecules are larger or equal to de
-    # requested number of structures
-    perform_final_clustering = True
-    if len(filtered_pool) < final_n_structures:
+    # Comparing the filtered_pool size with the requested number of structures:
+    if len(filtered_pool) > final_n_structures:     # Larger than requested
+        perform_final_clustering = True
+    elif len(filtered_pool) == final_n_structures:  # Equal to requested
+        print(lib.NOTE_EQUAL_TO_REQUESTED.format(len(filtered_pool)))
+        perform_final_clustering = False
+    elif len(filtered_pool) < final_n_structures:   # Less than requested
         print(lib.NOTE_LESS_THAN_REQUESTED.format(len(filtered_pool), len(
             filtered_pool)/final_n_structures, final_n_structures))
         perform_final_clustering = False
-    elif len(filtered_pool) == final_n_structures:
-        print(lib.NOTE_EQUAL_TO_REQUESTED.format(len(filtered_pool)))
-        perform_final_clustering = False
 
-    # final clustering
+    # Final clustering
     if perform_final_clustering:
         print('-'*80)
         print('Selecting representative structures')
-        mols_ab = np.array(filtered_pool)
-        features = []
-        for s_mol_ab in mols_ab:
-            features.append(s_mol_ab.features)
-        features = np.array(features)
-        top_score = 1e20
+        # organizing data
+        # mols_ab = np.array(filtered_pool)
+        # features = []
+        # for s_mol_ab in mols_ab:
+        #     features.append(s_mol_ab.features)
+        # features = np.array(features)
+        features = np.array([mol_ab.features for mol_ab in filtered_pool])
+        # Kmeans analysis, keeping the best model from n_repeat_final_km
+        top_score = np.inf
         for seed in range(n_repeat_final_km):
+            # creating and evaluating a model
             centroids, score = kmeans(features, final_n_structures, seed=seed)
+            # saving the best model
             if score < top_score:
                 top_score = score
                 top_centroids = centroids
+
+        # taking the representative molecule: the closest molecule to each
+        # centroid and the cluster indexes of each molecule
         idx, _ = vq(features, top_centroids)
         dists = cdist(top_centroids, features)
         representative_structures_index = np.argmin(dists, axis=1)
-        representative_mols = mols_ab[representative_structures_index]
+        representative_mols = [filtered_pool[i]
+                               for i in representative_structures_index]
+        # plotting a tsne dimensionality reduction to shows the clustering
         lib.plot_kmeans_tsne('clustering_representatives' + out_sufix,
                              features, idx, representative_structures_index)
 
-    # saving structures
+        mol_list = filtered_pool
+    else:
+        mol_list = representative_mols
+
+    # Saving structures
     print('+'+'-'*78+'+')
     print('SAVING INFORMATION ')
-    path_poll_w = 'folder_xyz_files{}_withsurfs/'.format(out_sufix)
-    path_poll = 'folder_xyz_files{}/'.format(out_sufix)
-    for path in [path_poll, path_poll_w]:
+
+    # Creating folders to save the xyz files, with and without surf data
+    path_final_pool_w = 'folder_xyz_files{}_withsurfs/'.format(out_sufix)
+    path_final_pool = 'folder_xyz_files{}/'.format(out_sufix)
+    for path in [path_final_pool, path_final_pool_w]:
         if not os.path.isdir(path):
             print('creating folder: {}'.format(path))
             os.makedirs(path)
         else:
+            # if the folders exist, remove then first
             print('removing folder: {}'.format(path))
             shutil.rmtree(path)
             print('creating folder: {}'.format(path))
             os.makedirs(path)
-    if perform_final_clustering:
-        mol_list = representative_mols
-    else:
-        mol_list = filtered_pool
+
+    # saving molecules to xyz files
     for ith, mol_ab in enumerate(mol_list):
-        mol_ab.to_xyz(path_poll_w + '/{}.xyz'.format(ith), surf_dots=True,
+        mol_ab.to_xyz(path_final_pool_w + '/{}.xyz'.format(ith), surf_dots=True,
                       surf_dots_color_by='kmeans', special_surf_dots='kmeans',
                       verbose=False)
-        mol_ab.to_xyz(path_poll + '/{}.xyz'.format(ith), verbose=False)
+        mol_ab.to_xyz(path_final_pool + '/{}.xyz'.format(ith), verbose=False)
 
     print('+'+'-'*78+'+')
 
