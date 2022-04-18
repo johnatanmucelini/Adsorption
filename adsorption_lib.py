@@ -33,6 +33,286 @@ NOTE_EQUAL_TO_REQUESTED = """
 +------------------------------------------------------------------------------+
 """
 
+NOTE_SINGLE_ATOM_NKM_NOTE_ONE = """+------------------------------------------------------------------------------+
+| WARNING: The following molecule is a single atom, and thus, the number of    |
+|          chemical envirowments will be redefined to one: {:<20s}|
++------------------------------------------------------------------------------+"""
+
+
+class Mol:
+    """The mol object carry all the information of the molecule."""
+
+    def __init__(self, path=None, positions=None, cheme=None, verbose=True):
+        """Initiate from a path or from the postions and chemical elements."""
+
+        # if provided, it initiate from the positions + chemical elements
+        self.path = path
+        self.positions = positions
+        self.cheme = cheme
+
+        # other variables
+        self.radii = None
+        self.surf_dots = None
+        self.surf_dots_atom = None
+        self.surf_atoms_index = None
+        self.surf_cheme = None
+        self.surf_atoms_positions = None
+        self.surf_atoms_raddii = None
+        self.surf_dots_km_index = None
+        self.surf_dots_km_rep_kmindex = None
+        self.surf_dots_km_rep_idx = None
+        self.surf_dots_km_rep = None
+        self.surf_dots_features = None
+        self.ipositions = None
+        self.isurf_dots = None
+        self.isurf_dots_km_rep = None
+
+        # if niether of the positions were privided exit
+        if self.path is None and (self.positions is None and self.cheme is
+                                  None):
+            err = 'Mol_path or positions + cheme must be provided to create ' \
+                  'a Mol.'
+            raise AttributeError(err)
+
+        # initiate from the path
+        if (self.positions is None and self.cheme is None) and self.path is not None:
+            if verbose:
+                print('Reading mol from {}'.format(self.path))
+            with open(self.path) as mol_file:
+                lines_as_list = mol_file.readlines()
+            self.n = int(lines_as_list[0].split()[0])
+            _positions = np.array([line.split()[0:]
+                                   for line in lines_as_list[2:self.n+2]])
+            _cheme = np.array([line.split()[0]
+                               for line in lines_as_list[2:self.n+2]])
+            self.cheme = np.array(_cheme, dtype=str)
+            self.positions = np.array(_positions[:, 1:4], dtype=float)
+
+    def get_radii(self, atoms_radii_preferences=[2]):
+        """Get the raddii of the present atoms based in a list of its
+        van-der-walls radius"""
+
+        msg_ref = "    Atom {}, vdw radii {}, ref {}."
+        msg_not_ref = "    Atom {}, vdw radii {}, missing reference!\n" \
+            "        WARNING: missing reference!\n" \
+            "        To add vdw radius search for VDW RADII in adsorption.py."
+
+        cheme_radii_dict = {}
+        for u_cheme in np.unique(self.cheme):
+            found = False
+            for obj in atoms_radii_preferences:
+                if not found:
+                    if isinstance(obj, dict):
+                        if u_cheme in obj.keys():
+                            cheme_radii_dict[u_cheme] = obj[u_cheme]
+                            found = True
+                            if 'ref' in obj.keys():
+                                print(msg_ref.format(
+                                    u_cheme, obj[u_cheme], obj['ref']))
+                            else:
+                                print(msg_not_ref.format(
+                                    u_cheme, obj[u_cheme]))
+                    if isinstance(obj, int):
+                        cheme_radii_dict[u_cheme] = obj[u_cheme]
+                        found = True
+                        print(msg_not_ref.format(
+                            u_cheme, obj[u_cheme], obj.ref))
+        self.radii = np.array([cheme_radii_dict[ele] for ele in self.cheme])
+
+    def build_surface(self, atoms_surface_density=10):
+        """This algorithm finds a surface of dots around the surface of the
+        molecule, considering the atoms as ridge spheres of given radii. It
+        also measures the exposed area per atom and the total area of the
+        surface."""
+
+        print("Mapping surface dots arround the atomic structure.")
+
+        # building the surface
+        dots, dots_atom, area = build_surfac_func(
+            self.cheme, self.positions, self.radii,
+            atoms_surface_density=atoms_surface_density)
+
+        # handling variables
+        self.surf_dots = dots
+        self.surf_dots_atom = dots_atom
+        self.surf_atoms_index = np.unique(dots_atom)
+        self.surf_cheme = self.cheme[self.surf_atoms_index]
+        self.surf_atoms_positions = self.positions[self.surf_atoms_index]
+        self.surf_atoms_raddii = self.radii[self.surf_atoms_index]
+
+        # area:
+        print('    N surface points       {:7d}'.format(len(dots)))
+        print('    Surface area            {:10.3f} AA'.format(area))
+        print(
+            '    Points density          {:10.3f} AA^-1'.format(len(dots)/area))
+
+    def featurization_surface_dots(self):
+        """Calculate the features vectors for a molecule as follows:
+        1) calculate the distance between references and positions,
+        2) calculate a slow-decay function of these distance values,
+        3) sort these results, for each reference and chemical element.
+        The slow-decay function is exp(-dist**(2/3)).
+        If no referece were privided it employed the molecules geometric
+        centroid.
+        """
+
+        print("Featurization of the surface dots.")
+        self.surf_dots_features = get_feature(self, self.surf_dots)
+
+    def clustering_surface_dots(self, name, n_cluster, n_repeat=5):
+        """Calculate the cluster of the surface dots: indexes and centroid
+        nearest"""
+
+        print("Clustering of the surface dots.")
+        data = self.surf_dots_features
+        top_score = 1e20
+
+        # kmeans
+        for seed in range(n_repeat):
+            # clustering, returning centroids and a score
+            centroids, score = kmeans(data, n_cluster, seed=seed)
+            if score < top_score:
+                # keeping only the best model
+                top_score = score
+                top_centroids = centroids
+        # getting the representative dots: the closest dots to each centroids
+        idx, _ = vq(data, top_centroids)
+        dists = cdist(top_centroids, data)
+        centroids_nearst_idx = np.argmin(dists, axis=1)
+
+        # handling variables
+        self.surf_dots_km_index = idx
+        self.surf_dots_km_rep_kmindex = idx[centroids_nearst_idx]
+        self.surf_dots_km_rep_idx = centroids_nearst_idx
+        self.surf_dots_km_rep = self.surf_dots[centroids_nearst_idx]
+
+        # ploting the results
+        plot_kmeans_tsne(name + '_km_tsne', data, idx, centroids_nearst_idx)
+
+    def translate_by(self, vector, image=False):
+        """Translate structure positions by a vector, real or image data."""
+        if image:
+            self.ipositions = self.positions + vector
+            self.isurf_dots = self.surf_dots + vector
+            self.isurf_dots_km_rep = self.surf_dots_km_rep + vector
+        else:
+            self.positions = self.positions + vector
+
+    def centralize(self):
+        """Centralize in itself."""
+        self.positions = self.positions - self.positions.mean(axis=0)
+
+    def rotate(self, rot_matrix, image=False):
+        """applay a rotation over the structure, real + surf image data."""
+        if image:
+            self.ipositions = np.dot(self.ipositions, rot_matrix)
+            self.isurf_dots = np.dot(self.isurf_dots, rot_matrix)
+            self.isurf_dots_km_rep = np.dot(self.isurf_dots_km_rep, rot_matrix)
+        else:
+            self.positions = np.dot(self.positions, rot_matrix)
+
+    def to_xyz(self, file_name, surf_dots=False, surf_dots_color_by=None,
+               special_surf_dots=None, verbose=True):
+        """Write mol object to a xyz files with and without surf dots."""
+
+        if verbose:
+            print('Writing mol to: {}'.format(file_name))
+
+        # creating the dummy atoms to represent surf and representative dots
+        letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+                  'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+                  'y', 'z']
+        color_base_surf = []
+        color_base_rep = []
+        for c1, c2 in zip(['@', '&', '$', '?', '%'], ['#', '!', '+', '-', '*']):
+            for le in letras:
+                color_base_surf.append(c1 + le)
+                color_base_rep.append(c2 + le)
+                if False:
+                    # printing data for vesta atoms colors configuration file
+                    color = np.random.rand(3)
+                    print('  1  {}  0.25  0.25  0.25     {:5.3f}    {:5.3f}    {:5.3f}'.format(
+                        c1+le, *color))
+                    print('  1  {}  0.40  0.40  0.40     {:5.3f}    {:5.3f}    {:5.3f}'.format(
+                        c2+le, *color))
+        color_base_surf = np.array(color_base_surf)
+        color_base_rep = np.array(color_base_rep)
+        surf_index_to_cheme_dict = {}
+        rep_index_to_cheme_dict = {}
+        for ith in range(len(color_base_surf)):
+            surf_index_to_cheme_dict[ith] = color_base_surf[ith]
+            rep_index_to_cheme_dict[ith] = color_base_rep[ith]
+
+        # adding xyz information
+        atoms_positions = self.positions
+        atoms_cheme = self.cheme
+        if len(atoms_positions) != len(atoms_cheme):
+            err = 'Tamanho dos vetores positions cheme é diferente b: ' \
+                '{} {}'.format(len(atoms_positions), len(atoms_cheme))
+            raise AttributeError(err)
+
+        # adding surf dots
+        if surf_dots:
+            atoms_positions = np.append(
+                atoms_positions, self.surf_dots, axis=0)
+            if surf_dots_color_by == 'kmeans':
+                # surf dots colored by kmeans cluster
+                new_chemes = []
+                for dot_km_index in self.surf_dots_km_index:
+                    new_chemes.append(surf_index_to_cheme_dict[dot_km_index])
+            elif surf_dots_color_by == 'atoms':
+                # surf dots colored by origin atom
+                new_chemes = []
+                for origin_atom_index in self.surf_dots_atom:
+                    new_chemes.append(
+                        surf_index_to_cheme_dict[origin_atom_index])
+            else:
+                new_chemes = np.array(['@A']*len(self.surf_dots))
+            atoms_cheme = np.append(atoms_cheme, np.array(new_chemes))
+
+        if len(atoms_positions) != len(atoms_cheme):
+            print('Tamanho dos vetores positions cheme é diferente s: {} {}'.format(
+                len(atoms_positions), len(atoms_cheme)))
+
+        # adding km representative dots result
+        if special_surf_dots:
+            # print('Special surf dots:', len(self.surf_dots_km_rep))
+            atoms_positions = np.append(atoms_positions, self.surf_dots_km_rep,
+                                        axis=0)
+            new_chemes = []
+            n_clusters = max(self.surf_dots_km_rep_kmindex) + 1
+            # print('Max km index:', max(self.surf_dots_km_rep_kmindex)
+            #       + 1, self.surf_dots_km_rep_kmindex)
+            for i in range(n_clusters):
+                if special_surf_dots == 'kmeans':
+                    new_chemes.append(rep_index_to_cheme_dict[i])
+                else:
+                    new_chemes.append(['XX'])
+            # print('new_chemes', len(new_chemes))
+            atoms_cheme = np.append(atoms_cheme, new_chemes)
+
+        # writting
+        if len(atoms_positions) != len(atoms_cheme):
+            err = 'Tamanho dos vetores positions cheme é diferente: '\
+                '{} {}'.format(len(atoms_positions), len(atoms_cheme))
+            raise AttributeError(err)
+        with open(file_name, mode='w') as xyz_file:
+            size = len(atoms_positions)
+            xyz_file.write(str(size) + '\n\n')
+            for ith, (element, position) in enumerate(zip(atoms_cheme, atoms_positions)):
+                if ith < size - 1:
+                    xyz_file.write('{} {} {} {}\n'.format(element, *position))
+                elif ith == size - 1:
+                    xyz_file.write('{} {} {} {}'.format(element, *position))
+
+    def image_to_real_with_surf(self):
+        """Copy the image vars of ipositions, isurf_dots and isurf_dots_km_rep
+        to they analog real vars positions, surf_dots and surf_dots_km_rep."""
+        if 'ipositions' in dir(self):
+            self.positions = self.ipositions * 1.
+            self.surf_dots = self.isurf_dots * 1.
+            self.surf_dots_km_rep = self.isurf_dots_km_rep * 1.
+
 
 def build_s2_grid(radius, n_sample_init, coords_system='cart'):
     """Generate an "almost" regular grid on the surface of sphere of given
@@ -309,281 +589,6 @@ def add_mols(mol_a, mol_b, image=False, add_surf_info=False):
                 mol_a.isurf_dots_km_rep, mol_b.isurf_dots_km_rep, axis=0)
     mol_f.n = len(mol_f.positions)
     return mol_f
-
-
-class Mol:
-    """The mol object carry all the information of the molecule."""
-
-    def __init__(self, path=None, positions=None, cheme=None, verbose=True):
-        """Initiate from a path or from the postions and chemical elements."""
-
-        # if provided, it initiate from the positions + chemical elements
-        self.path = path
-        self.positions = positions
-        self.cheme = cheme
-
-        # other variables
-        self.radii = None
-        self.surf_dots = None
-        self.surf_dots_atom = None
-        self.surf_atoms_index = None
-        self.surf_cheme = None
-        self.surf_atoms_positions = None
-        self.surf_atoms_raddii = None
-        self.surf_dots_km_index = None
-        self.surf_dots_km_rep_kmindex = None
-        self.surf_dots_km_rep_idx = None
-        self.surf_dots_km_rep = None
-        self.surf_dots_features = None
-        self.ipositions = None
-        self.isurf_dots = None
-        self.isurf_dots_km_rep = None
-
-        # if niether of the positions were privided exit
-        if self.path is None and (self.positions is None and self.cheme is
-                                  None):
-            err = 'Mol_path or positions + cheme must be provided to create ' \
-                  'a Mol.'
-            raise AttributeError(err)
-
-        # initiate from the path
-        if (self.positions is None and self.cheme is None) and self.path is not None:
-            if verbose:
-                print('Reading mol from {}'.format(self.path))
-            with open(self.path) as mol_file:
-                lines_as_list = mol_file.readlines()
-            self.n = int(lines_as_list[0].split()[0])
-            _positions = np.array([line.split()[0:]
-                                   for line in lines_as_list[2:self.n+2]])
-            _cheme = np.array([line.split()[0]
-                               for line in lines_as_list[2:self.n+2]])
-            self.cheme = np.array(_cheme, dtype=str)
-            self.positions = np.array(_positions[:, 1:4], dtype=float)
-
-    def get_radii(self, atoms_radii_preferences=[2]):
-        """Get the raddii of the present atoms based in a list of its
-        van-der-walls radius"""
-
-        msg_ref = "    Atom {}, vdw radii {}, ref {}."
-        msg_not_ref = "    Atom {}, vdw radii {}, missing reference!\n" \
-            "        WARNING: missing reference!\n" \
-            "        To add vdw radius search for VDW RADII in adsorption.py."
-
-        cheme_radii_dict = {}
-        for u_cheme in np.unique(self.cheme):
-            found = False
-            for obj in atoms_radii_preferences:
-                if not found:
-                    if isinstance(obj, dict):
-                        if u_cheme in obj.keys():
-                            cheme_radii_dict[u_cheme] = obj[u_cheme]
-                            found = True
-                            if 'ref' in obj.keys():
-                                print(msg_ref.format(
-                                    u_cheme, obj[u_cheme], obj['ref']))
-                            else:
-                                print(msg_not_ref.format(
-                                    u_cheme, obj[u_cheme]))
-                    if isinstance(obj, int):
-                        cheme_radii_dict[u_cheme] = obj[u_cheme]
-                        found = True
-                        print(msg_not_ref.format(
-                            u_cheme, obj[u_cheme], obj.ref))
-        self.radii = np.array([cheme_radii_dict[ele] for ele in self.cheme])
-
-    def build_surface(self, atoms_surface_density=10):
-        """This algorithm finds a surface of dots around the surface of the
-        molecule, considering the atoms as ridge spheres of given radii. It
-        also measures the exposed area per atom and the total area of the
-        surface."""
-
-        print("Mapping surface dots arround the atomic structure.")
-
-        # building the surface
-        dots, dots_atom, area = build_surfac_func(
-            self.cheme, self.positions, self.radii,
-            atoms_surface_density=atoms_surface_density)
-
-        # handling variables
-        self.surf_dots = dots
-        self.surf_dots_atom = dots_atom
-        self.surf_atoms_index = np.unique(dots_atom)
-        self.surf_cheme = self.cheme[self.surf_atoms_index]
-        self.surf_atoms_positions = self.positions[self.surf_atoms_index]
-        self.surf_atoms_raddii = self.radii[self.surf_atoms_index]
-
-        # area:
-        print('    N surface points       {:7d}'.format(len(dots)))
-        print('    Surface area            {:10.3f} AA'.format(area))
-        print(
-            '    Points density          {:10.3f} AA^-1'.format(len(dots)/area))
-
-    def featurization_surface_dots(self):
-        """Calculate the features vectors for a molecule as follows:
-        1) calculate the distance between references and positions,
-        2) calculate a slow-decay function of these distance values,
-        3) sort these results, for each reference and chemical element.
-        The slow-decay function is exp(-dist**(2/3)).
-        If no referece were privided it employed the molecules geometric
-        centroid.
-        """
-
-        print("Featurization of the surface dots.")
-        self.surf_dots_features = get_feature(self, self.surf_dots)
-
-    def clustering_surface_dots(self, name, n_cluster, n_repeat=5):
-        """Calculate the cluster of the surface dots: indexes and centroid
-        nearest"""
-
-        print("Clustering of the surface dots.")
-        data = self.surf_dots_features
-        top_score = 1e20
-
-        # kmeans
-        for seed in range(n_repeat):
-            # clustering, returning centroids and a score
-            centroids, score = kmeans(data, n_cluster, seed=seed)
-            if score < top_score:
-                # keeping only the best model
-                top_score = score
-                top_centroids = centroids
-        # getting the representative dots: the closest dots to each centroids
-        idx, _ = vq(data, top_centroids)
-        dists = cdist(top_centroids, data)
-        centroids_nearst_idx = np.argmin(dists, axis=1)
-
-        # handling variables
-        self.surf_dots_km_index = idx
-        self.surf_dots_km_rep_kmindex = idx[centroids_nearst_idx]
-        self.surf_dots_km_rep_idx = centroids_nearst_idx
-        self.surf_dots_km_rep = self.surf_dots[centroids_nearst_idx]
-
-        # ploting the results
-        plot_kmeans_tsne(name + '_km_tsne', data, idx, centroids_nearst_idx)
-
-    def translate_by(self, vector, image=False):
-        """Translate structure positions by a vector, real or image data."""
-        if image:
-            self.ipositions = self.positions + vector
-            self.isurf_dots = self.surf_dots + vector
-            self.isurf_dots_km_rep = self.surf_dots_km_rep + vector
-        else:
-            self.positions = self.positions + vector
-
-    def centralize(self):
-        """Centralize in itself."""
-        self.positions = self.positions - self.positions.mean(axis=0)
-
-    def rotate(self, rot_matrix, image=False):
-        """applay a rotation over the structure, real + surf image data."""
-        if image:
-            self.ipositions = np.dot(self.ipositions, rot_matrix)
-            self.isurf_dots = np.dot(self.isurf_dots, rot_matrix)
-            self.isurf_dots_km_rep = np.dot(self.isurf_dots_km_rep, rot_matrix)
-        else:
-            self.positions = np.dot(self.positions, rot_matrix)
-
-    def to_xyz(self, file_name, surf_dots=False, surf_dots_color_by=None,
-               special_surf_dots=None, verbose=True):
-        """Write mol object to a xyz files with and without surf dots."""
-
-        if verbose:
-            print('Writing mol to: {}'.format(file_name))
-
-        # creating the dummy atoms to represent surf and representative dots
-        letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
-                  'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-                  'y', 'z']
-        color_base_surf = []
-        color_base_rep = []
-        for c1, c2 in zip(['@', '&', '$', '?', '%'], ['#', '!', '+', '-', '*']):
-            for le in letras:
-                color_base_surf.append(c1 + le)
-                color_base_rep.append(c2 + le)
-                if False:
-                    # printing data for vesta atoms colors configuration file
-                    color = np.random.rand(3)
-                    print('  1  {}  0.25  0.25  0.25     {:5.3f}    {:5.3f}    {:5.3f}'.format(
-                        c1+le, *color))
-                    print('  1  {}  0.40  0.40  0.40     {:5.3f}    {:5.3f}    {:5.3f}'.format(
-                        c2+le, *color))
-        color_base_surf = np.array(color_base_surf)
-        color_base_rep = np.array(color_base_rep)
-        surf_index_to_cheme_dict = {}
-        rep_index_to_cheme_dict = {}
-        for ith in range(len(color_base_surf)):
-            surf_index_to_cheme_dict[ith] = color_base_surf[ith]
-            rep_index_to_cheme_dict[ith] = color_base_rep[ith]
-
-        # adding xyz information
-        atoms_positions = self.positions
-        atoms_cheme = self.cheme
-        if len(atoms_positions) != len(atoms_cheme):
-            err = 'Tamanho dos vetores positions cheme é diferente b: ' \
-                '{} {}'.format(len(atoms_positions), len(atoms_cheme))
-            raise AttributeError(err)
-
-        # adding surf dots
-        if surf_dots:
-            atoms_positions = np.append(
-                atoms_positions, self.surf_dots, axis=0)
-            if surf_dots_color_by == 'kmeans':
-                # surf dots colored by kmeans cluster
-                new_chemes = []
-                for dot_km_index in self.surf_dots_km_index:
-                    new_chemes.append(surf_index_to_cheme_dict[dot_km_index])
-            elif surf_dots_color_by == 'atoms':
-                # surf dots colored by origin atom
-                new_chemes = []
-                for origin_atom_index in self.surf_dots_atom:
-                    new_chemes.append(
-                        surf_index_to_cheme_dict[origin_atom_index])
-            else:
-                new_chemes = np.array(['@A']*len(self.surf_dots))
-            atoms_cheme = np.append(atoms_cheme, np.array(new_chemes))
-
-        if len(atoms_positions) != len(atoms_cheme):
-            print('Tamanho dos vetores positions cheme é diferente s: {} {}'.format(
-                len(atoms_positions), len(atoms_cheme)))
-
-        # adding km representative dots result
-        if special_surf_dots:
-            # print('Special surf dots:', len(self.surf_dots_km_rep))
-            atoms_positions = np.append(atoms_positions, self.surf_dots_km_rep,
-                                        axis=0)
-            new_chemes = []
-            n_clusters = max(self.surf_dots_km_rep_kmindex) + 1
-            # print('Max km index:', max(self.surf_dots_km_rep_kmindex)
-            #       + 1, self.surf_dots_km_rep_kmindex)
-            for i in range(n_clusters):
-                if special_surf_dots == 'kmeans':
-                    new_chemes.append(rep_index_to_cheme_dict[i])
-                else:
-                    new_chemes.append(['XX'])
-            # print('new_chemes', len(new_chemes))
-            atoms_cheme = np.append(atoms_cheme, new_chemes)
-
-        # writting
-        if len(atoms_positions) != len(atoms_cheme):
-            err = 'Tamanho dos vetores positions cheme é diferente: '\
-                '{} {}'.format(len(atoms_positions), len(atoms_cheme))
-            raise AttributeError(err)
-        with open(file_name, mode='w') as xyz_file:
-            size = len(atoms_positions)
-            xyz_file.write(str(size) + '\n\n')
-            for ith, (element, position) in enumerate(zip(atoms_cheme, atoms_positions)):
-                if ith < size - 1:
-                    xyz_file.write('{} {} {} {}\n'.format(element, *position))
-                elif ith == size - 1:
-                    xyz_file.write('{} {} {} {}'.format(element, *position))
-
-    def image_to_real_with_surf(self):
-        """Copy the image vars of ipositions, isurf_dots and isurf_dots_km_rep
-        to they analog real vars positions, surf_dots and surf_dots_km_rep."""
-        if 'ipositions' in dir(self):
-            self.positions = self.ipositions * 1.
-            self.surf_dots = self.isurf_dots * 1.
-            self.surf_dots_km_rep = self.isurf_dots_km_rep * 1.
 
 
 def overlap(mol_a, mol_b, ovlp_threshold=0.85, image=False):
