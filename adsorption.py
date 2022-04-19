@@ -235,13 +235,20 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('+'+'-'*78+'+')
     print('READING MOLECULES:')
     mol_a = lib.Mol(path=mol_a_path)
-    mol_a_name = os.path.basename(mol_a_path)
+    mol_a_name = os.path.basename(mol_a_path).replace('.xyz', '')
     mol_a.centralize()
     mol_a.get_radii(preference_order)
     mol_b = lib.Mol(path=mol_b_path)
-    mol_b_name = os.path.basename(mol_b_path)
+    mol_b_name = os.path.basename(mol_b_path).replace('.xyz', '')
     mol_b.centralize()
     mol_b.get_radii(preference_order)
+    if len(mol_a.positions) == 1 != mol_a_surf_km_k:
+        print(lib.NOTE_SINGLE_ATOM_NKM_NOTE_ONE.format(mol_a_name))
+        print('{:<{}s} {}'.format('N cluster surface A', left, mol_a_surf_km_k))
+    if len(mol_b.positions) == 1 != mol_b_surf_km_k:
+        print(lib.NOTE_SINGLE_ATOM_NKM_NOTE_ONE.format(mol_b_name))
+        mol_b_surf_km_k = 1
+        print('{:<{}s} {}'.format('N cluster surface B', left, mol_b_surf_km_k))
 
     # MAPPING SURFACES
     print('+'+'-'*78+'+')
@@ -312,7 +319,6 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                      np.zeros(3)])
 
                     # Computing the features
-                    # TODO: isso poderia ser criado uma única vez?
                     mol_ab.features = lib.get_feature(mol_ab,
                                                       reference=refs).flatten()
 
@@ -334,10 +340,6 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                         # build the molecule AB, with surface info
                         mol_ab_acc = lib.add_mols(
                             mol_a, mol_b, image=True, add_surf_info=True)
-                        # TODO: can i just repeat from previous mol_ab?
-                        # calculate the features again
-                        # mol_ab.features = metric.get_feature(
-                        # mol_ab, reference=refs).flatten()
                         mol_ab_acc.features = mol_ab.features * 1.
                         mol_ab_acc.image_to_real_with_surf()
                         filtered_pool.append(mol_ab_acc)
