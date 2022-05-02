@@ -119,13 +119,13 @@ class Mol:
                             u_cheme, obj[u_cheme], obj.ref))
         self.radii = np.array([cheme_radii_dict[ele] for ele in self.cheme])
 
-    def build_surface(self, atoms_surface_density=10):
+    def build_surface(self, atoms_surface_density=10, name=''):
         """This algorithm finds a surface of dots around the surface of the
         molecule, considering the atoms as ridge spheres of given radii. It
         also measures the exposed area per atom and the total area of the
         surface."""
 
-        print("Mapping surface dots arround the atomic structure.")
+        print("Mapping surface of {}".format(name))
 
         # building the surface
         dots, dots_atom, area = build_surfac_func(

@@ -14,7 +14,7 @@ Our methods mimic the ideia that two melecules could interact based on different
 The objective of this step is to get a set of K points on the surface of each molecule, these points must represent the diversity of different chemical environments around the molecule:
 
 - Read the mol and associate VDW radii for each atom:
-    There are VDW radii for some atoms (and their reference), but one can add VDW raddi manually, search for "VDW RADII" in the *adsorption.py* file.
+    There are VDW radii for some atoms (and their reference), but one can add VDW raddi manually, search for "add_your_vdw_radii_here" in the *adsorption.py* file.
 
 - Both molecule surfaces are mapped with dots:
     The surface of a molecule is an outside surface built with the union of  ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and mol_b_surf.xyz present this data [a]. Points in these spheres (SO2) are obtained with the algorithm describedby Deserno (see the article "How to generate equidistributed points on the surface of a sphere", https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf).

@@ -4,7 +4,7 @@ Salve pessoal, meu nome é Johnatan e nesse vídeo eu vou apresentar um algoritm
 
 # Resumo
 
-Imagina que queremos investigar as interações de duas estruturas em escala atômica como duas moléculas, por qualquer metodologia de simulação. Vamos chamar elas de A e B, e vamos chamar as estruturas combinadas de AB_1, AB_2 e assim por diante. Esse algoritmo cria um grupo de estruturas iniciais AB pra vc simular e investigar as interações entre A e B. Quantas estruturas vai ser, vc escolher. Mas independente do número de estruturas, elas são criadas para serem diferentes entre si. Isso é muito importante, tanto pra explorar o máximo do espaço das estruturas AB, quanto pra evitar simular estruturas muito parecidas ou iguais por simetria, já que elas vão te levar a resultados muito parecidos ou iguais.
+Imagina que queremos investigar as interações de duas estruturas em escala atômica como duas moléculas, por exemplo, por qualquer metodologia de simulação. Vamos chamar elas de A e B, e vamos chamar as estruturas combinadas de AB_1, AB_2 e assim por diante. Esse algoritmo cria um grupo de estruturas iniciais AB pra vc simular e investigar as interações entre A e B. Quantas estruturas vai ser, vc escolher. Mas independente do número de estruturas, elas são criadas para serem diferentes entre si. Isso é muito importante, tanto pra explorar o máximo do espaço das estruturas AB, quanto pra evitar simular estruturas muito parecidas ou iguais por simetria, já que elas vão te levar a resultados muito parecidos ou iguais.
 
 Na prática, vc da alguns parâmetros e as moléculas A e B no formato xyz, e o algoritimo devolve um grupo de estruturas ABs com um tamanho que vc escolhe.
 
@@ -46,14 +46,3 @@ No final do processo o pool deve ter muito mais estruturas que o número de estr
 ## Seleção de um grupo representativo
 
 Agora vamos selecionar um grupo representativo do pool de estruturas AB. Para isso, utilizaremos os mesmos descritores do passo anterior para fazer uma análise de clustering, que classifica os ABs em grupos de ABs parecidos. Para cada grupo de ABs, selecionaremos a estrutura com características mais próximas a média do grupo. A quantidade de grupos é definida pelo usuário. O resultado desse clustering é mostrado num mapa 2d através de uma redução de dimensionalidade com t-SNE.
-
-
-
-
-
-
-
-
-
-
-

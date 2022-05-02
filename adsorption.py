@@ -15,9 +15,10 @@ VDW radius (which could overlap regulated):
 
 (1) Read the mol and associate VDW radii for each atom:
     There are VDW radii for some atoms and their reference, but others can be
-    added manually, search for "VDW RADII AND ITS REF" in this document.
+    added manually, search for "add_your_vdw_radii_here" in adsorption.py.
 
-(2) Both molecule surfaces are mapped to find representative points:
+(2) Both molecule surfaces are mapped to find representative points for its
+    chemical environments:
     The surface of a molecule is an outside surface built with the union of
     ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and
     mol_b_surf.xyz present this data [a].
@@ -75,15 +76,15 @@ VDW radius (which could overlap regulated):
     information).
 
 Usage example:
-$ python adsorption.py --mols cluster.xyz molecule.xyz \\
-                       --surf_ks         5 9           \\
-                       --n_final         100           \\
-                       --surf_d           10           \\
-                       --n_repeat_km      20           \\
-                       --n_rot            60           \\
-                       --ovlp_threshold 0.95           \\
-                       --sim_threshold  0.04           \\
-                       --out_sufix        _2
+$ python adsorption.py --mols            A.xyz B.xyz \\
+                       --chem_envs       20 5        \\
+                       --n_final         50          \\
+                       --n_rot           60          \\
+                       --surf_d          10          \\
+                       --n_repeat_km     20          \\
+                       --ovlp_threshold  0.95        \\
+                       --sim_threshold   0.04        \\
+                       --out_sufix       _teste
 """
 
 # Parsing objects
@@ -93,25 +94,21 @@ parser._action_groups.pop()
 req = parser.add_argument_group('required arguments')
 opt = parser.add_argument_group('optional arguments')
 req.add_argument('--mols', nargs=2, action='store', metavar=('a.xyz', 'b.xyz'),
-                 required=True, help='The two molecules to adsorb.')
-req.add_argument('--surf_ks', nargs=2, action='store', metavar=('K_a', 'K_b'),
-                 required=True,
-                 help='Numbers k (K-means) for each surface dots clustering')
+                 required=True, help='The two molecules to adsorb')
+req.add_argument('--chem_envs', nargs=2, action='store', required=True,
+                 help='Numbers of chemical environments for each molecule surface')
 req.add_argument('--n_final', nargs=None, action='store',
                  metavar='N_final', required=True,
-                 help=('Number of final structures, in the representative set.'
-                       ))
+                 help='Number of final structures, in the representative set')
 opt.add_argument('--surf_d', nargs=None, action='store', metavar='val',
-                 default=10,
-                 help='Density of points over the atoms. (default: 10, '
-                 + 'AA^(-2))')
+                 default=20,
+                 help='Density of points to build surfaces in AA^-2 (default: 20)')
 opt.add_argument('--n_repeat_km', nargs=None, action='store', metavar='val',
                  default=20,
-                 help='Number of times to repeat each clustering. (default: '
-                      + '20)')
+                 help='Number of times to repeat each clustering (default: 20)')
 opt.add_argument('--n_rots', nargs=None, action='store', metavar='val',
                  default=60,
-                 help='approximatated number of rotations (default: 60)')
+                 help='Required number of rotations (default: 60)')
 opt.add_argument('--ovlp_threshold', nargs=None, action='store', metavar='val',
                  default=0.9,
                  help='Structures overlap threshold (default: 0.9)')
@@ -120,13 +117,11 @@ opt.add_argument('--sim_threshold', nargs=None, action='store', metavar='val',
                  help='Structures similarity threshold (default: 0.04)')
 opt.add_argument('--out_sufix', nargs=None, action='store', metavar='sufix',
                  default='',
-                 help='Sufix of the output folders:  folder_xyz_files+surfix '
-                      + 'and folder_xyz_files_withsurfs+surfix (default: None)'
-                 )
+                 help='Sufix of the output folders (default: None)')
 args = parser.parse_args()
 
 # Example or argument
-# argument = '--mols molecule.xyz cluster.xyz --surf_ks 10 40 --n_final 505 ' +
+# argument = '--mols molecule.xyz cluster.xyz --chem_envs 10 40 --n_final 505 ' +
 #            '--surf_d 10 --n_repeat_km 10 --n_rots 60 ' +
 #            '--ovlp_threshold 0.90 --sim_threshold 0.04 --out_sufix _3'
 # args = parser.parse_args(argument.split())
@@ -189,27 +184,30 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     print('{:<{}s} {}'.format('Mol B', left, mol_b_path))
 
     # Surface mapping
-    print('{:<{}s} {}'.format('N cluster surface A', left, mol_a_surf_km_k))
-    print('{:<{}s} {}'.format('N cluster surface B', left, mol_b_surf_km_k))
+    print('{:<{}s} {}'.format('N chemical envs in A', left, mol_a_surf_km_k))
+    print('{:<{}s} {}'.format('N chemical envs in B', left, mol_b_surf_km_k))
     print('{:<{}s} {} {}'.format('Surface mapping density',
                                  left, surface_density, 'AA^-2'))
     # Rotations
-    print('{:<{}s} {}'.format('N rotations final', left, n_rots))
     print('{:<{}s} {}'.format('N rotations requested', left, n_rot_r))
+    print('{:<{}s} {}'.format('N rotations final', left, n_rots))
     print('{:<{}s} {}'.format('N rotations S2', left, n_rots_s2))
     print('{:<{}s} {}'.format('N rotations S1', left, n_rots_s1))
+
+    # N structures
+    print('{:<{}s} {}'.format('N configurations', left, n_config))
+    print('{:<{}s} {}'.format('N final structure', left, final_n_structures))
 
     # Thresholds
     print('{:<{}s} {}'.format('Simility threshold', left, sim_threshold))
     print('{:<{}s} {}'.format('Overlatp threshold', left, ovlp_threshold))
 
     # Others
-    print('{:<{}s} {}'.format('N configurations', left, n_config))
-    print('{:<{}s} {}'.format('N final structure', left, final_n_structures))
     print('{:<{}s} {}'.format('N kmeans repetition', left, n_km_repeat))
 
     # VDW RADII:
-    # Add or edit vdw radii here, see the example bellow:
+    # Add your vdw radii here, see the example bellow:
+    add_your_vdw_radii_here = {}
     # ref: The Journal of Physical Chemistry, 68, 3, 1964
     vdw_atomic_radius_bondi = {'ref': 'J. Physical Chemistry, 68, 3, 1964',
                                'H': 1.20, 'He': 1.40, 'C': 1.70, 'N': 1.55,
@@ -217,7 +215,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                'P': 1.80, 'S': 1.80, 'Cl': 1.75, 'Ar': 1.88,
                                'As': 1.85, 'Se': 1.90, 'Br': 1.85, 'Kr': 2.02,
                                'Te': 2.06, 'I': 1.98, 'Xe': 2.16}
-    # Data with no ref (UNRILIABLE), if employed, a warning will be rised.
+    # I take the data below from internet, it is unreliable, if it was employed
+    # a warning will rise.
     wdw_atomic_radius_no_ref = {'H': 1.20, 'Tl': 1.96, 'He': 1.40, 'Pb': 2.02,
                                 'Li': 1.82, 'C': 1.70, 'Pd': 1.63, 'N': 1.55,
                                 'Ag': 1.72, 'O': 1.52, 'Cd': 1.58, 'F': 1.47,
@@ -227,7 +226,8 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
                                 'Cl': 1.75, 'K': 2.75, 'Ni': 1.63, 'Co': 1.40,
                                 'Zi': 1.39, 'Ga': 1.87, 'Ar': 1.85, 'Se': 1.90,
                                 'Br': 1.85, 'Kr': 2.02, 'Pt': 1.75, 'Mg': 1.55}
-    preference_order = [vdw_atomic_radius_bondi,
+    preference_order = [add_your_vdw_radii_here,
+                        vdw_atomic_radius_bondi,
                         wdw_atomic_radius_no_ref,
                         2.0]
 
@@ -242,19 +242,21 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
     mol_b_name = os.path.basename(mol_b_path).replace('.xyz', '')
     mol_b.centralize()
     mol_b.get_radii(preference_order)
+
+    # comparing the molecules sizes and the number of chemical envs requested
     if len(mol_a.positions) == 1 != mol_a_surf_km_k:
         print(lib.NOTE_SINGLE_ATOM_NKM_NOTE_ONE.format(mol_a_name))
-        print('{:<{}s} {}'.format('N cluster surface A', left, mol_a_surf_km_k))
+        print('{:<{}s} {}'.format('N chemical envs in A', left, mol_a_surf_km_k))
     if len(mol_b.positions) == 1 != mol_b_surf_km_k:
         print(lib.NOTE_SINGLE_ATOM_NKM_NOTE_ONE.format(mol_b_name))
         mol_b_surf_km_k = 1
-        print('{:<{}s} {}'.format('N cluster surface B', left, mol_b_surf_km_k))
+        print('{:<{}s} {}'.format('N chemical envs in B', left, mol_b_surf_km_k))
 
     # MAPPING SURFACES
     print('+'+'-'*78+'+')
     print('SURFACE MAPPING:')
-    mol_a.build_surface(atoms_surface_density=surface_density)
-    mol_b.build_surface(atoms_surface_density=surface_density)
+    mol_a.build_surface(atoms_surface_density=surface_density, name=mol_a_name)
+    mol_b.build_surface(atoms_surface_density=surface_density, name=mol_b_name)
     mol_a.to_xyz(mol_a_name + '_surf.xyz', surf_dots=True,
                  surf_dots_color_by='atoms')
     mol_b.to_xyz(mol_b_name + '_surf.xyz', surf_dots=True,
@@ -402,9 +404,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
         lib.plot_kmeans_tsne('clustering_representatives' + out_sufix,
                              features, idx, representative_structures_index)
 
-        mol_list = filtered_pool
-    else:
         mol_list = representative_mols
+    else:
+        mol_list = filtered_pool
 
     # Saving structures
     print('+'+'-'*78+'+')
@@ -436,9 +438,9 @@ def cluster_adsorption(mol_a_path, mol_a_surf_km_k, mol_b_path,
 
 if __name__ == '__main__':
     cluster_adsorption(args.mols[0],
-                       int(args.surf_ks[0]),
+                       int(args.chem_envs[0]),
                        args.mols[1],
-                       int(args.surf_ks[1]),
+                       int(args.chem_envs[1]),
                        final_n_structures=int(args.n_final),
                        n_km_repeat=int(args.n_repeat_km),
                        surface_density=float(args.surf_d),
