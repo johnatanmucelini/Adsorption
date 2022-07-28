@@ -1,12 +1,16 @@
 # Começo
 
-Salve pessoal, meu nome é Johnatan e nesse vídeo eu vou apresentar um algoritmo de adsorção que eu desenvolvi com minha amiga Lucas pro doutorado dela.
+- Salve trabalhadores da ciência do Brasil e do mundo!
+- Meu nome é Johnatan
+- Objetivo. Nesse vídeo eu vou apresentar um algoritmo que eu desenvolvi com minha amiga Lucas pro doutorado dela.
 
 # Resumo
 
-Imagina que queremos investigar as interações de duas estruturas em escala atômica como duas moléculas, por exemplo, por qualquer metodologia de simulação. Vamos chamar elas de A e B, e vamos chamar as estruturas combinadas de AB_1, AB_2 e assim por diante. Esse algoritmo cria um grupo de estruturas iniciais AB pra vc simular e investigar as interações entre A e B. Quantas estruturas vai ser, vc escolher. Mas independente do número de estruturas, elas são criadas para serem diferentes entre si. Isso é muito importante, tanto pra explorar o máximo do espaço das estruturas AB, quanto pra evitar simular estruturas muito parecidas ou iguais por simetria, já que elas vão te levar a resultados muito parecidos ou iguais.
+A ideia do algorithmo: é vc fornece duas estrutruas atômicas, por exemplo, A e B, e ele cria várias estruturas AB adsorvidas que são importantes pra estudo de interações intermoleculares, tanto, através de simulações via mecânica quântica quanto mecânica classica. Ele ainda pode ser utilizado pra outros propósitos como eu vou explicar no final do vídeo.
 
-Na prática, vc da alguns parâmetros e as moléculas A e B no formato xyz, e o algoritimo devolve um grupo de estruturas ABs com um tamanho que vc escolhe.
+Vc escolher quantas estruturas AB vão ser criadas, mas independente do número de estruturas, elas são criadas para serem diferentes entre si. Isso é muito importante, tanto pra explorar o máximo do espaço das estruturas AB, quanto pra evitar simular estruturas muito parecidas ou iguais por simetria, já que elas vão te levar a resultados muito parecidos ou iguais.
+
+Na prática, vc da duas moléculas A e B no formato xyz e alguns parâmetros, e o algoritimo devolve um grupo de estruturas ABs com o tamanho que vc escolhe.
 
 Bom, essa é a ideia geral. Agora vamo entrar na metodologia.
 
@@ -27,15 +31,15 @@ Vamo pra primeira parte da metodologia.
 
 Ele inicia com a definição de raios de van der Walls. Já existem raios pra alguns átomos no código, mas vc pode adicionar outros ou modificar os que tão la, só olhar o arquivo adsorption.py.
 
-Com eles vamos mapear uma superfície da molécula baseado em átomos como esferas rígidas. O raio dessas esferas é o raio de van der Walls. Como resultado nos pegamos uma grupo de pontos formando a superfície da molécula, tanto de A quanto de B. Pra encontrar as posições de cada ponto é um procedimento um pouco complexo, que não vou entrar em detalhes, tem detalhes e referências no readme. Aqui os pontos dessa superfície tão coloridos por átomo.
+Com eles vamos mapear uma superfície da molécula baseado em átomos como esferas rígidas. O raio dessas esferas é o raio de van der Walls. Como resultado nos pegamos uma grupo de pontos formando a superfície da molécula, tanto de A quanto de B. Pra encontrar as posições de cada ponto é um procedimento um pouco que não vou entrar em detalhes aqui, mas tem detalhes e referências no readme. Aqui os pontos dessa superfície tão coloridos por átomo.
 
-Agora, vamos investigar o ambiente químico perto de cada ponto dessa superfície. Ai vamos agrupar eles de acordo com ambientes químicos. E pra cada ambiente químico vamos pegar o ponto que é mais parecido com a média de todos. Na pratica isso é um processo de calcular descritores e fazer um clustering. O resultado desse clustering é mostrado num mapa 2d através de uma redução de dimensionalidade com t-SNE. Mais informações no readme. O importante é que vc precisa definir quantos ambientes químicos devem ser procurados em cada uma das moléculas A e B. Isso é um parâmetro do algorítmo. Aqui os pontos dessa superfície tão colorizados por ambiente químico e o pontos maiores são os pontos representativos desse ambiente químico. Note como esse procedimento percebe a simetria local das moléculas.
+Agora, encontrar os ambientes químicos. Explicando de uma forma mais lúdica, vamos investigar o ambiente químico perto de cada ponto dessa superfície. Ai vamos agrupar os pontos de ambientes químicos parecidos. E pra cada ambiente químico vamos pegar o ponto que é mais parecido com média dos ambientes químicos dos pontos do grupo. Na pratica isso é um processo de calcular descritores e fazer um uma análise de clustering. Não vou me aprofundar na metodologia, mas tem mais informações no readme. O importante desse passo é que vc precisa definir quantos ambientes químicos devem ser procurados em cada uma das moléculas A e B. (Isso é um parâmetro do algorítmo que quanto maior, melhor tende a ser o resultado final do algorítmo, mas também mais demorado ele vai ser, isso vai ficar mais claro depois). Aqui os pontos dessa superfície estão colorizados por ambiente químico e o pontos maiores são os pontos representativos desse ambiente químico. Note como esse procedimento percebe a simetria local das moléculas. Pra visualizar o resultado dessa análise é feita a redução de dimensionalidade dos features, com t-SNE, e apresentado um mapa 2d dos clusters encontrados.
 
 Agora vamos pra segunda parte da metodologia
 
 ## Adsorção
 
-Agora vamos combinar as moléculas A e B através de seus ambientes químicos. Todos os ambientes químicos de A contra todos os ambientes químicos de B. A combinação direta deles pode sobrepor as duas moléculas. E mesmo se não sobrepor, existem várias forma de encaixar A e B através de um mesmo ambientes. Então, vamos gerar ABs rotacionando a molécula B de várias formas antes da combinação. Essas rotações são feitas através de um grid no espaço das possíveis rotações, mas na prática, basta vc dar um número total de rotações desejado que o algoritmo faz o resto, as vezes esse número muda levemente. Mais informações no readme.
+Agora vamos combinar as moléculas A e B através de seus ambientes químicos. Todos os ambientes químicos de A contra todos os ambientes químicos de B. A combinação direta deles pode sobrepor as duas moléculas. E mesmo se não sobrepor, existem várias forma de encaixar A e B através de um mesmo ambientes. Então, vamos gerar ABs rotacionando a molécula B de várias formas antes da combinação. Essas rotações são feitas através de um grid no espaço das possíveis rotações que não vou entrar em detalhes, mas tem mais informações no readme. Na prática, o q é importante sobre as rotações é o número total de rotações desejado que o algoritmo faz o resto. O número final de rotações pode mudar levemente. Mais informações no readme.
 
 Desse modo, o numero total de estruturas testadas é igual ao produto do número de ambientes químicos em A, em B e o número de rotações.
 
