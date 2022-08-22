@@ -2,11 +2,11 @@
 
 The present algorithm generates sets of atomic structures of adsorbed molecules, considering ridge structures and atoms as spheres of VDW radius (or a fraction of it).
 
-| Input structure 1                |       | Input structure 2                |         | Result Structures                                                |
-|:---------------------------------|-------|:---------------------------------|---------|:-----------------------------------------------------------------|
-| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **>>>** | AB_1.xyz ![](.figures/99.png)                                    |
-|                                  |       |                                  |         |  ...                                                             |
-|                                  |       |                                  |         | AB_n.xyz ![](.figures/97.png)                                    |
+| Input structure 1                |       | Input structure 2                |         | Result Structures                                                | |
+|:---------------------------------|-------|:---------------------------------|---------|:-----------------------------------------------------------------|-|
+| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **>>>** | AB_1.xyz ![](.figures/99.png)                                    |  AB_1_surf_km.xyz ![](.figures/99_surf_km.png) |
+|                                  |       |                                  |         |  ...                                                             | |
+|                                  |       |                                  |         | AB_n.xyz ![](.figures/97.png)                                    |  AB_n_surf_km.xyz ![](.figures/97_surf_km.png) |
 
 ## Methodology
 
