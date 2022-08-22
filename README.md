@@ -1,4 +1,4 @@
-# MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
+# Molecular Adsorption by Surface Mapping Algorithm
 
 The present algorithm generates sets of atomic structures of adsorbed molecules, considering ridge structures and atoms as spheres of VDW radius (or a fraction of it).
 
