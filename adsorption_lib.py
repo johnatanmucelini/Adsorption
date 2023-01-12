@@ -525,8 +525,8 @@ def plot_kmeans_tsne(name, data, idx, rep_idx):
                        color=color, zorder=2)
 
             for single_data_idx in np.argwhere(data_indexes):
-                xi = features_2d[single_data_idx, 0]
-                yi = features_2d[single_data_idx, 1]
+                xi = features_2d[single_data_idx, 0][0]
+                yi = features_2d[single_data_idx, 1][0]
                 xs = np.array([xi, x_rep], float)
                 ys = np.array([yi, y_rep], float)
                 ax.plot(xs, ys, alpha=0.15, color=color, zorder=1)
