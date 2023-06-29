@@ -1,9 +1,12 @@
-# MOLECULAR ADSORPTION BY SURFACE MAPPING ALGORITHM
+# Molecular Adsorption by Surface Mapping Algorithm
 
 The present algorithm generates sets of atomic structures of adsorbed molecules, considering ridge structures and atoms as spheres of VDW radius (or a fraction of it).
 
-| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **>>>** | AB_1.xyz ![](.figures/99.png)  AB_2.xyz ![](.figures/97.png) ... |
-|----------------------------------|-------|----------------------------------|-----|------------------------------------------------------------------|
+| Input structure 1                |       | Input structure 2                |         | Result Structures                                                | |
+|:---------------------------------|-------|:---------------------------------|---------|:-----------------------------------------------------------------|-|
+| A.xyz ![](.figures/cluster.png)  | **+** | B.xyz ![](.figures/molecule.png) | **>>>** | AB_1.xyz ![](.figures/99.png)                                    |  AB_1_surf_km.xyz ![](.figures/99_surf_km.png) |
+|                                  |       |                                  |         |  ...                                                             | |
+|                                  |       |                                  |         | AB_n.xyz ![](.figures/97.png)                                    |  AB_n_surf_km.xyz ![](.figures/97_surf_km.png) |
 
 ## Methodology
 
@@ -14,18 +17,21 @@ Our methods mimic the ideia that two melecules could interact based on different
 The objective of this step is to get a set of K points on the surface of each molecule, these points must represent the diversity of different chemical environments around the molecule:
 
 - Read the mol and associate VDW radii for each atom:
-    There are VDW radii for some atoms and their reference, but others can be
-    added manually, search for "VDW RADII AND ITS REF" in this document.
+    There are VDW radii for some atoms (and their reference), but one can add VDW raddi manually, search for "add_your_vdw_radii_here" in the *adsorption.py* file.
 
 - Both molecule surfaces are mapped with dots:
     The surface of a molecule is an outside surface built with the union of  ridge spheres of VDW radii around each atom. The files mol_a_surf.xyz and mol_b_surf.xyz present this data [a]. Points in these spheres (SO2) are obtained with the algorithm describedby Deserno (see the article "How to generate equidistributed points on the surface of a sphere", https://www.cmu.edu/biolphys/deserno/pdf/sphere_equi.pdf).
 
 - Featurize, clusterize and find representative dots among the surface dots.
-    For each point of the surface, features are extracted. The features vector contains the sorted distances from the point to each atom of the molecule, separated by the chemical element of the atoms. Based on a K-means clustering, the surface dots are clusters/groups, and the point nearest to the centroid of its clusters is selected as its representative point in the molecular surface. The files mol_a_km.xyz and mol_b_km.xyz present this data [a].
+    For each point of the surface, a feature vector is calculated as presented in the image below. The feature vector present an entry per atom. The order of the entries is sorted by chemical element and distances from the reference point in the surface to the atom. Then, based on a K-means clustering employed with these features data, the surface dots are grouped. The groups represent regions with similar chemical environment. The surface point with the features nearest to the mean feature values of each cluster is selected as a representative point in the molecular surface. The files mol_a_km.xyz and mol_b_km.xyz present this data [a].
+
+![](.figures/surface_feature_vector.png)
+
+###### The files written during the surface mapping:
 
 | Input structures (*.xyz)   | ![](.figures/cluster.png)      | ![](.figures/molecule.png)
 |---------------------------|-------------------------------|---------------------------
-| **Surface dots (*_surf.xyz)**         | ![](.figures/cluster_surf.png) | ![](.figures/molecule_surf.png)
+| **Surface dots (*_surf.xyz)**          | ![](.figures/cluster_surf.png) | ![](.figures/molecule_surf.png)
 | **Surface dots clustering (*_km.xyz)** | ![](.figures/cluster_km.png)   | ![](.figures/molecule_km.png)
 | **Clustering in t-SNE reduced features** | ![](.figures/cluster_km_tsne.png) | ![](.figures/molecule_km_tsne.png)
 
@@ -38,11 +44,16 @@ The structure with the surface dots can be seen in the [VESTA](https://jp-minera
 The objective of this step is to obtain a pull with many and diverse adsorbed structures. Adsorption is performed by combining both molecules by each pair of the representative point of its surfaces. Moreover, for each pair of representative points, many rotations are performed to guarantee good matches between the molecules. These rotations are performed with a grid of rotations of SO3, obtained with a method called Successive Orthogonal Images on SOn. The method was first presented by Mitchell ([DOI:10.1137/030601879](https://doi.org/10.1137/030601879)), but for the present implementation I followed the paper by Yershova ([DOI:10.1177/0278364909352700](https://doi.org/10.1177/0278364909352700)). Note that, the number of adsorbed molecules configurations to analyze is deterministic and is the product of the number of surface clusters for each molecule and the number of rotations in SO3.
 
 A configurations is added to a pull when:
- - The molecules did not overlap in the adsorption, which is considered to have happened when a pair of atoms of different molecules were distant by less than the sum of their VDW radii multiplied by the parameter ovlp_threshold;
+ - The molecules did not overlap in the adsorption, which is considered to have happened when a pair of atoms of different molecules were distant by less than the sum of their VDW radii multiplied by the parameter ovlp_threshold. The parameter in general is above 0.90 and is important to guarantee that a adsorbed configurations generated are plausible.
 
- - The present structures is not similar to any one in the in the pull of structure, which is verify with a simple filtering. The adsorbed configurations are featurized with a method similar to the surface points. First, the distances between three key points and each atom are calculated and sorted, keeping separations by each atom type and key point. The key points are the geometrical center of each molecule and the position of the representative surface dots that were employed to create the present configuration. If the euclidian distance between the present configuration and all other structures in the pull were smaller than sim_threshold parameter.
+ - The present adsorbed configuration should be different to any other adsorbed configuration in the pull of structures, which is verify with a simple filtering. The filtering is based on the euclidian distance between a feature vector for the present adsorbed configuration and all others feature vectors for the structures in the pull were larger than sim_threshold parameter, the present structure will be included in the pull. For each adsorbed configuration a feature vector is calculated as presented in the figure below.
 
-Example structures:
+    Note that this feature vector is equivalant to the concatenation of three feature vectors similar as the ones calated for suface points but only one reference point is on the surface. Two reference points are in the geometrical center of the molecules seapartedly. The last reference point is the position were the two representative surface dots are combined to create the present adsorbed configuration. The parameter must be setted acording to each pair of structures and is important to avoid overrpresenting some regions of the space of adsorption configurations.
+
+
+![](.figures/adsorbed_structure_feature_vector.png)
+
+Example of adsorbed structures:
 
 | ![](.figures/97.png) | ![](.figures/97_surf_km.png)
 |---------------------|-----------------------------|
@@ -72,13 +83,23 @@ A vizualization of the clustering process is indicated in the file clustering_re
 Example with required arguments:
 ```bash
 $ cd example
-$ python ../adsorption.py --mols cluster.xyz molecule.xyz --surf_ks 20 10 --n_final 100
+$ python ../adsorption.py --mols            A.xyz B.xyz \\
+                          --chem_envs       20 5        \\
+                          --n_final         50
 ```
 
 Example with all arguments:
 ```bash
 $ cd example
-$ python ../adsorption.py --mols cluster.xyz molecule.xyz --surf_ks 30 10 --n_final 100 --surf_d 10 --n_repeat_km 20 --n_rot 100 --ovlp_threshold 0.90 --sim_threshold  0.04 --out_sufix _2
+$ python ../adsorption.py --mols            A.xyz B.xyz \\
+                          --chem_envs       20 5        \\
+                          --n_final         50          \\
+                          --n_rot           60          \\
+                          --surf_d          10          \\
+                          --n_repeat_km     20          \\
+                          --ovlp_threshold  0.95        \\
+                          --sim_threshold   0.04        \\
+                          --out_sufix       _teste
 ```
 
 ## Comparison of representative sets
